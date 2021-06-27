@@ -4,47 +4,57 @@ from deemix.utils import removeDuplicateArtists, removeFeatures
 from deemix.types.Artist import Artist
 from deemix.types.Date import Date
 from deemix.types.Picture import Picture
-from deemix import VARIOUS_ARTISTS
+from deemix.types import VARIOUS_ARTISTS
 
 class Album:
-    def __init__(self, id="0", title="", pic_md5=""):
-        self.id = id
+    def __init__(self, alb_id="0", title="", pic_md5=""):
+        self.id = alb_id
         self.title = title
-        self.pic = Picture(md5=pic_md5, type="cover")
+        self.pic = Picture(pic_md5, "cover")
         self.artist = {"Main": []}
         self.artists = []
         self.mainArtist = None
-        self.dateString = None
-        self.barcode = "Unknown"
-        self.date = None
+        self.date = Date()
+        self.dateString = ""
+        self.trackTotal = "0"
         self.discTotal = "0"
-        self.embeddedCoverPath = None
-        self.embeddedCoverURL = None
+        self.embeddedCoverPath = ""
+        self.embeddedCoverURL = ""
         self.explicit = False
         self.genre = []
+        self.barcode = "Unknown"
         self.label = "Unknown"
+        self.copyright = ""
         self.recordType = "album"
-        self.rootArtist = None
-        self.trackTotal = "0"
         self.bitrate = 0
+        self.rootArtist = None
         self.variousArtists = None
+
+        self.playlistId = None
+        self.owner = None
+        self.isPlaylist = False
 
     def parseAlbum(self, albumAPI):
         self.title = albumAPI['title']
 
         # Getting artist image ID
         # ex: https://e-cdns-images.dzcdn.net/images/artist/f2bc007e9133c946ac3c3907ddc5d2ea/56x56-000000-80-0-0.jpg
-        artistPicture = albumAPI['artist']['picture_small']
-        artistPicture = artistPicture[artistPicture.find('artist/') + 7:-24]
+        art_pic = albumAPI['artist']['picture_small']
+        art_pic = art_pic[art_pic.find('artist/') + 7:-24]
         self.mainArtist = Artist(
-            id = albumAPI['artist']['id'],
-            name = albumAPI['artist']['name'],
-            pic_md5 = artistPicture
+            albumAPI['artist']['id'],
+            albumAPI['artist']['name'],
+            "Main",
+            art_pic
         )
         if albumAPI.get('root_artist'):
+            art_pic = albumAPI['root_artist']['picture_small']
+            art_pic = art_pic[art_pic.find('artist/') + 7:-24]
             self.rootArtist = Artist(
-                id = albumAPI['root_artist']['id'],
-                name = albumAPI['root_artist']['name']
+                albumAPI['root_artist']['id'],
+                albumAPI['root_artist']['name'],
+                "Root",
+                art_pic
             )
 
         for artist in albumAPI['contributors']:
@@ -53,7 +63,7 @@ class Album:
 
             if isVariousArtists:
                 self.variousArtists = Artist(
-                    id = artist['id'],
+                    art_id = artist['id'],
                     name = artist['name'],
                     role = artist['role']
                 )
@@ -74,18 +84,19 @@ class Album:
         self.label = albumAPI.get('label', self.label)
         self.explicit = bool(albumAPI.get('explicit_lyrics', False))
         if 'release_date' in albumAPI:
-            day = albumAPI["release_date"][8:10]
-            month = albumAPI["release_date"][5:7]
-            year = albumAPI["release_date"][0:4]
-            self.date = Date(year, month, day)
+            self.date.day = albumAPI["release_date"][8:10]
+            self.date.month = albumAPI["release_date"][5:7]
+            self.date.year = albumAPI["release_date"][0:4]
+            self.date.fixDayMonth()
 
         self.discTotal = albumAPI.get('nb_disk')
         self.copyright = albumAPI.get('copyright')
 
-        if not self.pic.md5:
+        if self.pic.md5 == "":
             # Getting album cover MD5
             # ex: https://e-cdns-images.dzcdn.net/images/cover/2e018122cb56986277102d2041a592c8/56x56-000000-80-0-0.jpg
-            self.pic.md5 = albumAPI['cover_small'][albumAPI['cover_small'].find('cover/') + 6:-24]
+            alb_pic = albumAPI['cover_small']
+            self.pic.md5 = alb_pic[alb_pic.find('cover/') + 6:-24]
 
         if albumAPI.get('genres') and len(albumAPI['genres'].get('data', [])) > 0:
             for genre in albumAPI['genres']['data']:
@@ -94,8 +105,9 @@ class Album:
     def parseAlbumGW(self, albumAPI_gw):
         self.title = albumAPI_gw['ALB_TITLE']
         self.mainArtist = Artist(
-            id = albumAPI_gw['ART_ID'],
-            name = albumAPI_gw['ART_NAME']
+            art_id = albumAPI_gw['ART_ID'],
+            name = albumAPI_gw['ART_NAME'],
+            role = "Main"
         )
 
         self.artists = [albumAPI_gw['ART_NAME']]
@@ -106,13 +118,16 @@ class Album:
         explicitLyricsStatus = albumAPI_gw.get('EXPLICIT_ALBUM_CONTENT', {}).get('EXPLICIT_LYRICS_STATUS', LyricsStatus.UNKNOWN)
         self.explicit = explicitLyricsStatus in [LyricsStatus.EXPLICIT, LyricsStatus.PARTIALLY_EXPLICIT]
 
-        if not self.pic.md5:
+        self.addExtraAlbumGWData(albumAPI_gw)
+
+    def addExtraAlbumGWData(self, albumAPI_gw):
+        if self.pic.md5 == "":
             self.pic.md5 = albumAPI_gw['ALB_PICTURE']
         if 'PHYSICAL_RELEASE_DATE' in albumAPI_gw:
-            day = albumAPI_gw["PHYSICAL_RELEASE_DATE"][8:10]
-            month = albumAPI_gw["PHYSICAL_RELEASE_DATE"][5:7]
-            year = albumAPI_gw["PHYSICAL_RELEASE_DATE"][0:4]
-            self.date = Date(year, month, day)
+            self.date.day = albumAPI_gw["PHYSICAL_RELEASE_DATE"][8:10]
+            self.date.month = albumAPI_gw["PHYSICAL_RELEASE_DATE"][5:7]
+            self.date.year = albumAPI_gw["PHYSICAL_RELEASE_DATE"][0:4]
+            self.date.fixDayMonth()
 
     def makePlaylistCompilation(self, playlist):
         self.variousArtists = playlist.variousArtists
@@ -131,10 +146,12 @@ class Album:
         self.playlistId = playlist.playlistId
         self.owner = playlist.owner
         self.pic = playlist.pic
+        self.isPlaylist = True
 
     def removeDuplicateArtists(self):
+        """Removes duplicate artists for both artist array and artists dict"""
         (self.artist, self.artists) = removeDuplicateArtists(self.artist, self.artists)
 
-    # Removes featuring from the album name
     def getCleanTitle(self):
+        """Removes featuring from the album name"""
         return removeFeatures(self.title)

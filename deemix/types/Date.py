@@ -1,8 +1,8 @@
-class Date(object):
-    def __init__(self, year="XXXX", month="00", day="00"):
-        self.year = year
-        self.month = month
+class Date:
+    def __init__(self, day="00", month="00", year="XXXX"):
         self.day = day
+        self.month = month
+        self.year = year
         self.fixDayMonth()
 
     # Fix incorrect day month when detectable

@@ -4,10 +4,10 @@ from mutagen.id3 import ID3, ID3NoHeaderError, \
     TPUB, TSRC, USLT, SYLT, APIC, IPLS, TCOM, TCOP, TCMP, Encoding, PictureType
 
 # Adds tags to a MP3 file
-def tagID3(stream, track, save):
+def tagID3(path, track, save):
     # Delete exsisting tags
     try:
-        tag = ID3(stream)
+        tag = ID3(path)
         tag.delete()
     except ID3NoHeaderError:
         tag = ID3()
@@ -111,15 +111,15 @@ def tagID3(stream, track, save):
         with open(track.album.embeddedCoverPath, 'rb') as f:
             tag.add(APIC(descEncoding, mimeType, PictureType.COVER_FRONT, desc='cover', data=f.read()))
 
-    tag.save( stream,
+    tag.save( path,
               v1=2 if save['saveID3v1'] else 0,
               v2_version=3,
               v23_sep=None if save['useNullSeparator'] else '/' )
 
 # Adds tags to a FLAC file
-def tagFLAC(stream, track, save):
+def tagFLAC(path, track, save):
     # Delete exsisting tags
-    tag = FLAC(stream)
+    tag = FLAC(path)
     tag.delete()
     tag.clear_pictures()
 

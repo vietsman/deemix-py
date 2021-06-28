@@ -329,6 +329,7 @@ class Downloader:
                 with open(writepath, 'wb') as stream:
                     streamTrack(stream, track, downloadObject=self.downloadObject, listener=self.listener)
             except requests.exceptions.HTTPError as e:
+                if writepath.is_file(): writepath.unlink()
                 raise DownloadFailed('notAvailable', track) from e
             except OSError as e:
                 if writepath.is_file(): writepath.unlink()

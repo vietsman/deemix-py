@@ -177,6 +177,14 @@ class Downloader:
             else:
                 self.listener.send("finishDownload", self.downloadObject.uuid)
 
+    def log(self, data, state):
+        if self.listener:
+            self.listener.send('downloadInfo', {'uuid': self.downloadObject.uuid, 'data': data, 'state': state})
+
+    def warn(self, data, state, solution):
+        if self.listener:
+            self.listener.send('downloadWarn', {'uuid': self.downloadObject.uuid, 'data': data, 'state': state, 'solution': solution})
+
     def download(self, extraData, track=None):
         returnData = {}
         trackAPI_gw = extraData['trackAPI_gw']
@@ -186,11 +194,15 @@ class Downloader:
         if self.downloadObject.isCanceled: raise DownloadCanceled
         if trackAPI_gw['SNG_ID'] == "0": raise DownloadFailed("notOnDeezer")
 
-        itemName = f"[{trackAPI_gw['ART_NAME']} - {trackAPI_gw['SNG_TITLE']}]"
+        itemData = {
+            'id': trackAPI_gw['SNG_ID'],
+            'title': trackAPI_gw['SNG_TITLE'].strip(),
+            'artist': trackAPI_gw['ART_NAME']
+        }
 
         # Create Track object
         if not track:
-            logger.info("%s Getting the tags", itemName)
+            self.log(itemData, "getTags")
             try:
                 track = Track().parseData(
                     dz=self.dz,
@@ -203,13 +215,19 @@ class Downloader:
                 raise DownloadError('albumDoesntExists') from e
             except MD5NotFound as e:
                 raise DownloadError('notLoggedIn') from e
+            self.log(itemData, "gotTags")
 
-        itemName = f"[{track.mainArtist.name} - {track.title}]"
+        itemData = {
+            'id': track.id,
+            'title': track.title,
+            'artist': track.mainArtist.name
+        }
 
         # Check if track not yet encoded
         if track.MD5 == '': raise DownloadFailed("notEncoded", track)
 
         # Choose the target bitrate
+        self.log(itemData, "getBitrate")
         try:
             selectedFormat = getPreferredBitrate(
                 track,
@@ -223,6 +241,7 @@ class Downloader:
             raise DownloadFailed("no360RA") from e
         track.bitrate = selectedFormat
         track.album.bitrate = selectedFormat
+        self.log(itemData, "gotBitrate")
 
         # Apply settings
         track.applySettings(self.settings)
@@ -248,8 +267,9 @@ class Downloader:
         track.album.embeddedCoverPath = TEMPDIR / ((f"pl{track.playlist.id}" if track.album.isPlaylist else f"alb{track.album.id}") + f"_{self.settings['embeddedArtworkSize']}{ext}")
 
         # Download and cache coverart
-        logger.info("%s Getting the album cover", itemName)
+        self.log(itemData, "getAlbumArt")
         track.album.embeddedCoverPath = downloadImage(track.album.embeddedCoverURL, track.album.embeddedCoverPath)
+        self.log(itemData, "gotAlbumArt")
 
         # Save local album art
         if coverPath:
@@ -322,7 +342,6 @@ class Downloader:
             writepath = Path(currentFilename)
 
         if not trackAlreadyDownloaded or self.settings['overwriteFile'] == OverwriteOption.OVERWRITE:
-            logger.info("%s Downloading the track", itemName)
             track.downloadUrl = generateStreamURL(track.id, track.MD5, track.mediaVersion, track.bitrate)
 
             try:
@@ -335,14 +354,14 @@ class Downloader:
                 if writepath.is_file(): writepath.unlink()
                 if e.errno == errno.ENOSPC: raise DownloadFailed("noSpaceLeft") from e
                 raise e
-
+            self.log(itemData, "downloaded")
         else:
-            logger.info("%s Skipping track as it's already downloaded", itemName)
+            self.log(itemData, "alreadyDownloaded")
             self.downloadObject.completeTrackProgress(self.listener)
 
         # Adding tags
         if (not trackAlreadyDownloaded or self.settings['overwriteFile'] in [OverwriteOption.ONLY_TAGS, OverwriteOption.OVERWRITE]) and not track.local:
-            logger.info("%s Applying tags to the track", itemName)
+            self.log(itemData, "tagging")
             if extension == '.mp3':
                 tagID3(writepath, track, self.settings['tags'])
             elif extension == '.flac':
@@ -350,17 +369,17 @@ class Downloader:
                     tagFLAC(writepath, track, self.settings['tags'])
                 except (FLACNoHeaderError, FLACError):
                     writepath.unlink()
-                    logger.warning("%s Track not available in FLAC, falling back if necessary", itemName)
+                    logger.warning("%s Track not available in FLAC, falling back if necessary", f"{itemData['artist']} - {itemData['title']}")
                     self.downloadObject.removeTrackProgress(self.listener)
                     track.filesizes['FILESIZE_FLAC'] = "0"
                     track.filesizes['FILESIZE_FLAC_TESTED'] = True
                     return self.download(trackAPI_gw, track=track)
+            self.log(itemData, "tagged")
 
         if track.searched: returnData['searched'] = True
         self.downloadObject.downloaded += 1
         self.downloadObject.files.append(str(writepath))
         self.downloadObject.extrasPath = str(self.extrasPath)
-        logger.info("%s Track download completed\n%s", itemName, writepath)
         if self.listener: self.listener.send("updateQueue", {
             'uuid': self.downloadObject.uuid,
             'downloaded': True,
@@ -368,11 +387,7 @@ class Downloader:
             'extrasPath': str(self.extrasPath)
         })
         returnData['filename'] = str(writepath)[len(str(extrasPath))+ len(pathSep):]
-        returnData['data'] = {
-            'id': track.id,
-            'title': track.title,
-            'artist': track.mainArtist.name
-        }
+        returnData['data'] = itemData
         return returnData
 
     def downloadWrapper(self, extraData, track=None):
@@ -382,15 +397,13 @@ class Downloader:
             del extraData['trackAPI_gw']['_EXTRA_TRACK']
             del trackAPI_gw['_EXTRA_TRACK']
         # Temp metadata to generate logs
-        tempTrack = {
+        itemData = {
             'id': trackAPI_gw['SNG_ID'],
             'title': trackAPI_gw['SNG_TITLE'].strip(),
             'artist': trackAPI_gw['ART_NAME']
         }
         if trackAPI_gw.get('VERSION') and trackAPI_gw['VERSION'] not in trackAPI_gw['SNG_TITLE']:
-            tempTrack['title'] += f" {trackAPI_gw['VERSION']}".strip()
-
-        itemName = f"[{tempTrack['artist']} - {tempTrack['title']}]"
+            itemData['title'] += f" {trackAPI_gw['VERSION']}".strip()
 
         try:
             result = self.download(extraData, track)
@@ -398,13 +411,13 @@ class Downloader:
             if error.track:
                 track = error.track
                 if track.fallbackID != "0":
-                    logger.warning("%s %s Using fallback id", itemName, error.message)
+                    self.warn(itemData, error.errid, 'fallback')
                     newTrack = self.dz.gw.get_track_with_fallback(track.fallbackID)
                     track.parseEssentialData(newTrack)
                     track.retriveFilesizes(self.dz)
                     return self.downloadWrapper(extraData, track)
                 if not track.searched and self.settings['fallbackSearch']:
-                    logger.warning("%s %s Searching for alternative", itemName, error.message)
+                    self.warn(itemData, error.errid, 'search')
                     searchedId = self.dz.api.get_track_id_from_metadata(track.mainArtist.name, track.title, track.album.title)
                     if searchedId != "0":
                         newTrack = self.dz.gw.get_track_with_fallback(searchedId)
@@ -423,17 +436,16 @@ class Downloader:
                         return self.downloadWrapper(extraData, track)
                 error.errid += "NoAlternative"
                 error.message = errorMessages[error.errid]
-            logger.error("%s %s", itemName, error.message)
             result = {'error': {
                 'message': error.message,
                 'errid': error.errid,
-                'data': tempTrack
+                'data': itemData
             }}
         except Exception as e:
-            logger.exception("%s %s", itemName, e)
+            logger.exception("%s %s", f"{itemData['artist']} - {itemData['title']}", e)
             result = {'error': {
                 'message': str(e),
-                'data': tempTrack
+                'data': itemData
             }}
 
         if 'error' in result:

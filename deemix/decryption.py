@@ -44,7 +44,11 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
     headers= {'User-Agent': USER_AGENT_HEADER}
     chunkLength = start
 
-    itemName = f"[{track.mainArtist.name} - {track.title}]"
+    itemData = {
+        'id': track.id,
+        'title': track.title,
+        'artist': track.mainArtist.name
+    }
 
     try:
         with get(track.downloadUrl, headers=headers, stream=True, timeout=10) as request:
@@ -57,7 +61,7 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
                 if listener:
                     listener.send('downloadInfo', {
                         'uuid': downloadObject.uuid,
-                        'itemName': itemName,
+                        'data': itemData,
                         'state': "downloading",
                         'alreadyStarted': True,
                         'value': responseRange
@@ -66,7 +70,7 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
                 if listener:
                     listener.send('downloadInfo', {
                         'uuid': downloadObject.uuid,
-                        'itemName': itemName,
+                        'data': itemData,
                         'state': "downloading",
                         'alreadyStarted': False,
                         'value': complete
@@ -86,7 +90,6 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
                     downloadObject.updateProgress(listener)
 
     except (SSLError, u3SSLError):
-        logger.info('%s retrying from byte %s', itemName, chunkLength)
         streamTrack(outputStream, track, chunkLength, downloadObject, listener)
     except (RequestsConnectionError, ReadTimeout, ChunkedEncodingError):
         sleep(2)
@@ -97,7 +100,11 @@ def streamCryptedTrack(outputStream, track, start=0, downloadObject=None, listen
     headers= {'User-Agent': USER_AGENT_HEADER}
     chunkLength = start
 
-    itemName = f"[{track.mainArtist.name} - {track.title}]"
+    itemData = {
+        'id': track.id,
+        'title': track.title,
+        'artist': track.mainArtist.name
+    }
 
     try:
         with get(track.downloadUrl, headers=headers, stream=True, timeout=10) as request:
@@ -111,7 +118,7 @@ def streamCryptedTrack(outputStream, track, start=0, downloadObject=None, listen
                 if listener:
                     listener.send('downloadInfo', {
                         'uuid': downloadObject.uuid,
-                        'itemName': itemName,
+                        'data': itemData,
                         'state': "downloading",
                         'alreadyStarted': True,
                         'value': responseRange
@@ -120,7 +127,7 @@ def streamCryptedTrack(outputStream, track, start=0, downloadObject=None, listen
                 if listener:
                     listener.send('downloadInfo', {
                         'uuid': downloadObject.uuid,
-                        'itemName': itemName,
+                        'data': itemData,
                         'state': "downloading",
                         'alreadyStarted': False,
                         'value': complete
@@ -143,7 +150,6 @@ def streamCryptedTrack(outputStream, track, start=0, downloadObject=None, listen
                     downloadObject.updateProgress(listener)
 
     except (SSLError, u3SSLError):
-        logger.info('%s retrying from byte %s', itemName, chunkLength)
         streamCryptedTrack(outputStream, track, chunkLength, downloadObject, listener)
     except (RequestsConnectionError, ReadTimeout, ChunkedEncodingError):
         sleep(2)

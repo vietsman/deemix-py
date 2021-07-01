@@ -92,7 +92,7 @@ class Album:
         self.discTotal = albumAPI.get('nb_disk')
         self.copyright = albumAPI.get('copyright')
 
-        if self.pic.md5 == "":
+        if self.pic.md5 == "" and albumAPI.get('cover_small'):
             # Getting album cover MD5
             # ex: https://e-cdns-images.dzcdn.net/images/cover/2e018122cb56986277102d2041a592c8/56x56-000000-80-0-0.jpg
             alb_pic = albumAPI['cover_small']
@@ -121,7 +121,7 @@ class Album:
         self.addExtraAlbumGWData(albumAPI_gw)
 
     def addExtraAlbumGWData(self, albumAPI_gw):
-        if self.pic.md5 == "":
+        if self.pic.md5 == "" and albumAPI_gw.get('ALB_PICTURE'):
             self.pic.md5 = albumAPI_gw['ALB_PICTURE']
         if 'PHYSICAL_RELEASE_DATE' in albumAPI_gw:
             self.date.day = albumAPI_gw["PHYSICAL_RELEASE_DATE"][8:10]

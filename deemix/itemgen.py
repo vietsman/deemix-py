@@ -19,7 +19,7 @@ def generateTrackItem(dz, link_id, bitrate, trackAPI=None, albumAPI=None):
             link_id = trackAPI['id']
         else:
             raise ISRCnotOnDeezer(f"https://deezer.com/track/{link_id}")
-    if not link_id.isdecimal(): raise InvalidID(f"https://deezer.com/track/{link_id}")
+    if not str(link_id).isdecimal(): raise InvalidID(f"https://deezer.com/track/{link_id}")
 
     # Get essential track info
     try:
@@ -68,7 +68,7 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
         except APIError as e:
             raise GenerationError(f"https://deezer.com/album/{link_id}", str(e)) from e
 
-    if not link_id.isdecimal(): raise InvalidID(f"https://deezer.com/album/{link_id}")
+    if not str(link_id).isdecimal(): raise InvalidID(f"https://deezer.com/album/{link_id}")
 
     # Get extra info about album
     # This saves extra api calls when downloading
@@ -118,7 +118,7 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
 
 def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksAPI=None):
     if not playlistAPI:
-        if not link_id.isdecimal(): raise InvalidID(f"https://deezer.com/playlist/{link_id}")
+        if not str(link_id).isdecimal(): raise InvalidID(f"https://deezer.com/playlist/{link_id}")
         # Get essential playlist info
         try:
             playlistAPI = dz.api.get_playlist(link_id)
@@ -169,7 +169,7 @@ def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksA
     })
 
 def generateArtistItem(dz, link_id, bitrate, listener=None):
-    if not link_id.isdecimal(): raise InvalidID(f"https://deezer.com/artist/{link_id}")
+    if not str(link_id).isdecimal(): raise InvalidID(f"https://deezer.com/artist/{link_id}")
     # Get essential artist info
     try:
         artistAPI = dz.api.get_artist(link_id)
@@ -196,7 +196,7 @@ def generateArtistItem(dz, link_id, bitrate, listener=None):
     return albumList
 
 def generateArtistDiscographyItem(dz, link_id, bitrate, listener=None):
-    if not link_id.isdecimal(): raise InvalidID(f"https://deezer.com/artist/{link_id}/discography")
+    if not str(link_id).isdecimal(): raise InvalidID(f"https://deezer.com/artist/{link_id}/discography")
     # Get essential artist info
     try:
         artistAPI = dz.api.get_artist(link_id)
@@ -224,7 +224,7 @@ def generateArtistDiscographyItem(dz, link_id, bitrate, listener=None):
     return albumList
 
 def generateArtistTopItem(dz, link_id, bitrate):
-    if not link_id.isdecimal(): raise InvalidID(f"https://deezer.com/artist/{link_id}/top_track")
+    if not str(link_id).isdecimal(): raise InvalidID(f"https://deezer.com/artist/{link_id}/top_track")
     # Get essential artist info
     try:
         artistAPI = dz.api.get_artist(link_id)

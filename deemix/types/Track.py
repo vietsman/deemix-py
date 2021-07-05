@@ -159,7 +159,7 @@ class Track:
 
         # Make sure there is at least one artist
         if len(self.artist['Main']) == 0:
-            self.artist['Main'] = [self.mainArtist['name']]
+            self.artist['Main'] = [self.mainArtist.name]
 
         self.position = trackAPI_gw.get('POSITION')
 

@@ -50,7 +50,12 @@ def download(url, bitrate, portable, path):
 
         for link in links:
             downloadObject = generateDownloadObject(dz, link, bitrate)
-            Downloader(dz, downloadObject, settings).start()
+            if isinstance(downloadObject, list):
+                for obj in downloadObject:
+                    Downloader(dz, obj, settings).start()
+            else:
+                Downloader(dz, downloadObject, settings).start()
+
 
     if path is not None:
         if path == '': path = '.'

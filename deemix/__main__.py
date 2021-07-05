@@ -10,6 +10,16 @@ from deemix.settings import load as loadSettings
 from deemix.utils import getBitrateNumberFromText
 import deemix.utils.localpaths as localpaths
 from deemix.downloader import Downloader
+from deemix.plugins.spotify import Spotify
+
+class LogListener:
+    @classmethod
+    def send(cls, key, value):
+        if value:
+            print(key, value)
+        else:
+            print(key)
+
 
 @click.command()
 @click.option('--portable', is_flag=True, help='Creates the config folder in the same directory where the script is launched')
@@ -23,6 +33,7 @@ def download(url, bitrate, portable, path):
 
     settings = loadSettings(configFolder)
     dz = Deezer(settings.get('tagsLanguage', ""))
+    listener = LogListener()
 
     def requestValidArl():
         while True:
@@ -38,6 +49,11 @@ def download(url, bitrate, portable, path):
     with open(configFolder / '.arl', 'w') as f:
         f.write(arl)
 
+    plugins = {
+        "spotify": Spotify()
+    }
+    plugins["spotify"].setup()
+
     def downloadLinks(url, bitrate=None):
         if not bitrate: bitrate = settings.get("maxBitrate", TrackFormats.MP3_320)
         links = []
@@ -49,12 +65,12 @@ def download(url, bitrate, portable, path):
                 links.append(link)
 
         for link in links:
-            downloadObject = generateDownloadObject(dz, link, bitrate)
+            downloadObject = generateDownloadObject(dz, link, bitrate, plugins, listener)
             if isinstance(downloadObject, list):
                 for obj in downloadObject:
-                    Downloader(dz, obj, settings).start()
+                    Downloader(dz, obj, settings, listener).start()
             else:
-                Downloader(dz, downloadObject, settings).start()
+                Downloader(dz, downloadObject, settings, listener).start()
 
 
     if path is not None:

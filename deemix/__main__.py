@@ -10,6 +10,7 @@ from deemix.settings import load as loadSettings
 from deemix.utils import getBitrateNumberFromText
 import deemix.utils.localpaths as localpaths
 from deemix.downloader import Downloader
+from deemix.itemgen import GenerationError
 from deemix.plugins.spotify import Spotify
 
 class LogListener:
@@ -65,7 +66,11 @@ def download(url, bitrate, portable, path):
                 links.append(link)
 
         for link in links:
-            downloadObject = generateDownloadObject(dz, link, bitrate, plugins, listener)
+            try:
+                downloadObject = generateDownloadObject(dz, link, bitrate, plugins, listener)
+            except GenerationError as e:
+                print(f"{e.link}: {e.message}")
+                continue
             if isinstance(downloadObject, list):
                 for obj in downloadObject:
                     Downloader(dz, obj, settings, listener).start()

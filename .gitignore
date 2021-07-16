@@ -26,12 +26,12 @@ yarn-error.log*
 *.sw?
 
 # Private configs
-/config.py
-/test.py
-/config/
+config.py
+test.py
+config
 
 #build files
-/build
-/*egg-info
-/updatePyPi.sh
-/deezer
+build
+*egg-info
+updatePyPi.sh
+deezer

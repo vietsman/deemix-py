@@ -54,7 +54,7 @@ class Spotify(Plugin):
 
         return (link, link_type, link_id)
 
-    def generateDownloadObject(self, dz, link, bitrate):
+    def generateDownloadObject(self, dz, link, bitrate, listener):
         (link, link_type, link_id) = self.parseLink(link)
 
         if link_type is None or link_id is None: return None

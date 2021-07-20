@@ -24,7 +24,7 @@ from deemix.types.Picture import StaticPicture
 from deemix.utils import USER_AGENT_HEADER
 from deemix.utils.pathtemplates import generatePath, generateAlbumName, generateArtistName, generateDownloadObjectName
 from deemix.tagger import tagID3, tagFLAC
-from deemix.decryption import generateStreamURL, streamTrack, DownloadCanceled
+from deemix.decryption import generateCryptedStreamURL, streamTrack, DownloadCanceled
 from deemix.settings import OverwriteOption
 
 logger = logging.getLogger('deemix')
@@ -99,7 +99,7 @@ def getPreferredBitrate(track, bitrate, shouldFallback, uuid=None, listener=None
 
     def testBitrate(track, formatNumber, formatName):
         request = requests.head(
-            generateStreamURL(track.id, track.MD5, track.mediaVersion, formatNumber),
+            generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, formatNumber),
             headers={'User-Agent': USER_AGENT_HEADER},
             timeout=30
         )
@@ -342,7 +342,7 @@ class Downloader:
             writepath = Path(currentFilename)
 
         if not trackAlreadyDownloaded or self.settings['overwriteFile'] == OverwriteOption.OVERWRITE:
-            track.downloadUrl = generateStreamURL(track.id, track.MD5, track.mediaVersion, track.bitrate)
+            track.downloadUrl = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, track.bitrate)
 
             try:
                 with open(writepath, 'wb') as stream:

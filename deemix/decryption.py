@@ -43,6 +43,7 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
     if downloadObject.isCanceled: raise DownloadCanceled
     headers= {'User-Agent': USER_AGENT_HEADER}
     chunkLength = start
+    isCryptedStream = "/mobile/" in track.downloadUrl
 
     itemData = {
         'id': track.id,
@@ -53,6 +54,8 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
     try:
         with get(track.downloadUrl, headers=headers, stream=True, timeout=10) as request:
             request.raise_for_status()
+            if isCryptedStream:
+                blowfish_key = generateBlowfishKey(str(track.id))
 
             complete = int(request.headers["Content-Length"])
             if complete == 0: raise DownloadEmpty
@@ -77,6 +80,10 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
                     })
 
             for chunk in request.iter_content(2048 * 3):
+                if isCryptedStream:
+                    if len(chunk) >= 2048:
+                        chunk = decryptChunk(blowfish_key, chunk[0:2048]) + chunk[2048:]
+
                 outputStream.write(chunk)
                 chunkLength += len(chunk)
 
@@ -94,66 +101,6 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
     except (RequestsConnectionError, ReadTimeout, ChunkedEncodingError):
         sleep(2)
         streamTrack(outputStream, track, start, downloadObject, listener)
-
-def streamCryptedTrack(outputStream, track, start=0, downloadObject=None, listener=None):
-    if downloadObject.isCanceled: raise DownloadCanceled
-    headers= {'User-Agent': USER_AGENT_HEADER}
-    chunkLength = start
-
-    itemData = {
-        'id': track.id,
-        'title': track.title,
-        'artist': track.mainArtist.name
-    }
-
-    try:
-        with get(track.downloadUrl, headers=headers, stream=True, timeout=10) as request:
-            request.raise_for_status()
-            blowfish_key = str.encode(generateBlowfishKey(str(track.id)))
-
-            complete = int(request.headers["Content-Length"])
-            if complete == 0: raise DownloadEmpty
-            if start != 0:
-                responseRange = request.headers["Content-Range"]
-                if listener:
-                    listener.send('downloadInfo', {
-                        'uuid': downloadObject.uuid,
-                        'data': itemData,
-                        'state': "downloading",
-                        'alreadyStarted': True,
-                        'value': responseRange
-                    })
-            else:
-                if listener:
-                    listener.send('downloadInfo', {
-                        'uuid': downloadObject.uuid,
-                        'data': itemData,
-                        'state': "downloading",
-                        'alreadyStarted': False,
-                        'value': complete
-                    })
-
-            for chunk in request.iter_content(2048 * 3):
-                if len(chunk) >= 2048:
-                    chunk = decryptChunk(blowfish_key, chunk[0:2048]) + chunk[2048:]
-
-                outputStream.write(chunk)
-                chunkLength += len(chunk)
-
-                if downloadObject:
-                    if isinstance(downloadObject, Single):
-                        chunkProgres = (chunkLength / (complete + start)) * 100
-                        downloadObject.progressNext = chunkProgres
-                    else:
-                        chunkProgres = (len(chunk) / (complete + start)) / downloadObject.size * 100
-                        downloadObject.progressNext += chunkProgres
-                    downloadObject.updateProgress(listener)
-
-    except (SSLError, u3SSLError):
-        streamCryptedTrack(outputStream, track, chunkLength, downloadObject, listener)
-    except (RequestsConnectionError, ReadTimeout, ChunkedEncodingError):
-        sleep(2)
-        streamCryptedTrack(outputStream, track, start, downloadObject, listener)
 
 class DownloadCanceled(Exception):
     pass

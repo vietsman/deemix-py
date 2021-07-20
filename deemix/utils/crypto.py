@@ -20,7 +20,7 @@ def generateBlowfishKey(trackId):
     bfKey = ""
     for i in range(16):
         bfKey += chr(ord(idMd5[i]) ^ ord(idMd5[i + 16]) ^ ord(SECRET[i]))
-    return bfKey
+    return str.encode(bfKey)
 
 def decryptChunk(key, data):
     return Blowfish.new(key, Blowfish.MODE_CBC, b"\x00\x01\x02\x03\x04\x05\x06\x07").decrypt(data)

@@ -11,7 +11,7 @@ from deemix.itemgen import generateTrackItem, \
     LinkNotRecognized, \
     LinkNotSupported
 
-__version__ = "3.2.0"
+__version__ = "3.2.2"
 
 # Returns the Resolved URL, the Type and the ID
 def parseLink(link):

@@ -112,7 +112,7 @@ class Spotify(Plugin):
         spotifyPlaylist = self.sp.playlist(link_id)
 
         playlistAPI = self._convertPlaylistStructure(spotifyPlaylist)
-        playlistAPI.various_artist = dz.api.get_artist(5080) # Useful for save as compilation
+        playlistAPI['various_artist'] = dz.api.get_artist(5080) # Useful for save as compilation
 
         tracklistTemp = spotifyPlaylist.track.items
         while spotifyPlaylist['tracks']['next']:

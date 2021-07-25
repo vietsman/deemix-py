@@ -81,7 +81,7 @@ def downloadImage(url, path, overwrite=OverwriteOption.DONT_OVERWRITE):
         logger.exception("Error while downloading an image, you should report this to the developers: %s", e)
     return None
 
-def getPreferredBitrate(track, bitrate, shouldFallback, uuid=None, listener=None):
+def getPreferredBitrate(track, bitrate, shouldFallback, currentUser, uuid=None, listener=None):
     bitrate = int(bitrate)
     if track.local: return TrackFormats.LOCAL
 
@@ -134,6 +134,8 @@ def getPreferredBitrate(track, bitrate, shouldFallback, uuid=None, listener=None
                 if testedBitrate: return testedBitrate
 
         if not shouldFallback:
+            if formatName == "FLAC" and not currentUser['can_stream_lossless'] or formatName == "MP3_320" and not currentUser['can_stream_hq']:
+                raise WrongLicense(formatName)
             raise PreferredBitrateNotFound
         if not falledBack:
             falledBack = True
@@ -246,8 +248,10 @@ class Downloader:
                 track,
                 self.bitrate,
                 self.settings['fallbackBitrate'],
-                self.downloadObject.uuid, self.listener
+                self.dz.current_user, self.downloadObject.uuid, self.listener
             )
+        except WrongLicense as e:
+            raise DownloadFailed("wrongLicense") from e
         except PreferredBitrateNotFound as e:
             raise DownloadFailed("wrongBitrate", track) from e
         except TrackNot360 as e:
@@ -573,6 +577,7 @@ errorMessages = {
     'notEncodedNoAlternative': "Track not yet encoded and no alternative found!",
     'wrongBitrate': "Track not found at desired bitrate.",
     'wrongBitrateNoAlternative': "Track not found at desired bitrate and no alternative found!",
+    'wrongLicense': "Your account can't stream the track at the desired bitrate",
     'no360RA': "Track is not available in Reality Audio 360.",
     'notAvailable': "Track not available on deezer's servers!",
     'notAvailableNoAlternative': "Track not available on deezer's servers and no alternative found!",
@@ -592,3 +597,7 @@ class PreferredBitrateNotFound(DownloadError):
 
 class TrackNot360(DownloadError):
     pass
+
+class WrongLicense(DownloadError):
+    def __init__(self, format):
+        self.message = f"Your account doesn't have the license to stream {format}"

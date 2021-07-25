@@ -81,7 +81,7 @@ def downloadImage(url, path, overwrite=OverwriteOption.DONT_OVERWRITE):
         logger.exception("Error while downloading an image, you should report this to the developers: %s", e)
     return None
 
-def getPreferredBitrate(track, bitrate, shouldFallback, currentUser, uuid=None, listener=None):
+def getPreferredBitrate(dz, track, bitrate, shouldFallback, currentUser, uuid=None, listener=None):
     bitrate = int(bitrate)
     if track.local: return TrackFormats.LOCAL
 
@@ -110,7 +110,9 @@ def getPreferredBitrate(track, bitrate, shouldFallback, currentUser, uuid=None, 
 
     def testBitrate(track, formatNumber, formatName):
         if formatName not in track.urls:
-            track.urls[formatName] = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, formatNumber)
+            url = dz.get_track_url(track.trackToken, formatName)
+            if not url: url = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, formatNumber)
+            track.urls[formatName] = url
         request = requests.head(
             track.urls[formatName],
             headers={'User-Agent': USER_AGENT_HEADER},
@@ -245,6 +247,7 @@ class Downloader:
         self.log(itemData, "getBitrate")
         try:
             selectedFormat = getPreferredBitrate(
+                self.dz,
                 track,
                 self.bitrate,
                 self.settings['fallbackBitrate'],
@@ -360,7 +363,9 @@ class Downloader:
 
         if not trackAlreadyDownloaded or self.settings['overwriteFile'] == OverwriteOption.OVERWRITE:
             if formatsName[track.bitrate] not in track.urls:
-                track.urls[formatsName[track.bitrate]] = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, track.bitrate)
+                url = self.dz.get_track_url(track.trackToken, formatsName[track.bitrate])
+                if not url: url = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, track.bitrate)
+                track.urls[formatsName[track.bitrate]] = url
             track.downloadURL = track.urls[formatsName[track.bitrate]]
 
             try:
@@ -434,7 +439,6 @@ class Downloader:
                     newTrack = self.dz.gw.get_track_with_fallback(track.fallbackID)
                     track.parseEssentialData(newTrack)
                     track.retriveFilesizes(self.dz)
-                    track.retriveTrackURLs(self.dz)
                     return self.downloadWrapper(extraData, track)
                 if not track.searched and self.settings['fallbackSearch']:
                     self.warn(itemData, error.errid, 'search')
@@ -443,7 +447,6 @@ class Downloader:
                         newTrack = self.dz.gw.get_track_with_fallback(searchedId)
                         track.parseEssentialData(newTrack)
                         track.retriveFilesizes(self.dz)
-                        track.retriveTrackURLs(self.dz)
                         track.searched = True
                         if self.listener: self.listener.send('queueUpdate', {
                             'uuid': self.downloadObject.uuid,

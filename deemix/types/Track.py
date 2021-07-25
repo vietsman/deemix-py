@@ -68,6 +68,7 @@ class Track:
         if 'FALLBACK' in trackAPI_gw:
             self.fallbackID = trackAPI_gw['FALLBACK']['SNG_ID']
         self.local = int(self.id) < 0
+        self.urls = {}
 
     def retriveFilesizes(self, dz):
         guest_sid = dz.session.cookies.get('sid')
@@ -107,7 +108,6 @@ class Track:
             except APIError: trackAPI = None
 
         self.parseEssentialData(trackAPI_gw, trackAPI)
-        self.retriveTrackURLs(dz)
 
         if self.local:
             self.parseLocalTrackData(trackAPI_gw)
@@ -244,12 +244,6 @@ class Track:
                 if not artist['role'] in self.artist:
                     self.artist[artist['role']] = []
                 self.artist[artist['role']].append(artist['name'])
-
-    def retriveTrackURLs(self, dz):
-        urls = dz.get_tracks_urls(self.trackToken)
-        self.urls = {}
-        for url in urls[0]['media']:
-            self.urls[url['format']] = url['sources'][0]['url']
 
     def removeDuplicateArtists(self):
         (self.artist, self.artists) = removeDuplicateArtists(self.artist, self.artists)

@@ -23,7 +23,7 @@ setup(
     python_requires='>=3.7',
     packages=find_packages(exclude=("tests",)),
     include_package_data=True,
-    install_requires=["click", "pycryptodomex", "mutagen", "requests", "spotipy>=2.11.0", "deezer-py>=1.0.1"],
+    install_requires=["click", "pycryptodomex", "mutagen", "requests", "spotipy>=2.11.0", "deezer-py>=1.0.2"],
     entry_points={
         "console_scripts": [
             "deemix=deemix.__main__:download",

@@ -23,6 +23,7 @@ class Track:
         self.title = name
         self.MD5 = ""
         self.mediaVersion = ""
+        self.trackToken = ""
         self.duration = 0
         self.fallbackID = "0"
         self.filesizes = {}
@@ -50,16 +51,18 @@ class Track:
         self.artistsString = ""
         self.mainArtistsString = ""
         self.featArtistsString = ""
+        self.urls = {}
 
     def parseEssentialData(self, trackAPI_gw, trackAPI=None):
         self.id = str(trackAPI_gw['SNG_ID'])
         self.duration = trackAPI_gw['DURATION']
+        self.trackToken = trackAPI_gw['TRACK_TOKEN']
         self.MD5 = trackAPI_gw.get('MD5_ORIGIN')
         if not self.MD5:
             if trackAPI and trackAPI.get('md5_origin'):
                 self.MD5 = trackAPI['md5_origin']
-            else:
-                raise MD5NotFound
+            #else:
+            #    raise MD5NotFound
         self.mediaVersion = trackAPI_gw['MEDIA_VERSION']
         self.fallbackID = "0"
         if 'FALLBACK' in trackAPI_gw:
@@ -104,6 +107,7 @@ class Track:
             except APIError: trackAPI = None
 
         self.parseEssentialData(trackAPI_gw, trackAPI)
+        self.retriveTrackURLs(dz)
 
         if self.local:
             self.parseLocalTrackData(trackAPI_gw)
@@ -240,6 +244,12 @@ class Track:
                 if not artist['role'] in self.artist:
                     self.artist[artist['role']] = []
                 self.artist[artist['role']].append(artist['name'])
+
+    def retriveTrackURLs(self, dz):
+        urls = dz.get_tracks_urls(self.trackToken)
+        self.urls = {}
+        for url in urls[0]['media']:
+            self.urls[url['format']] = url['sources'][0]['url']
 
     def removeDuplicateArtists(self):
         (self.artist, self.artists) = removeDuplicateArtists(self.artist, self.artists)

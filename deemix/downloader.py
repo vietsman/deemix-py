@@ -40,6 +40,17 @@ extensions = {
     TrackFormats.MP4_RA1: '.mp4'
 }
 
+formatsName = {
+    TrackFormats.FLAC:    'FLAC',
+    TrackFormats.LOCAL:   'MP3_MISC',
+    TrackFormats.MP3_320: 'MP3_320',
+    TrackFormats.MP3_128: 'MP3_128',
+    TrackFormats.DEFAULT: 'MP3_MISC',
+    TrackFormats.MP4_RA3: 'MP4_RA3',
+    TrackFormats.MP4_RA2: 'MP4_RA2',
+    TrackFormats.MP4_RA1: 'MP4_RA1'
+}
+
 TEMPDIR = Path(gettempdir()) / 'deemix-imgs'
 if not TEMPDIR.is_dir(): makedirs(TEMPDIR)
 
@@ -98,8 +109,10 @@ def getPreferredBitrate(track, bitrate, shouldFallback, uuid=None, listener=None
         formats = formats_non_360
 
     def testBitrate(track, formatNumber, formatName):
+        if formatName not in track.urls:
+            track.urls[formatName] = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, formatNumber)
         request = requests.head(
-            generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, formatNumber),
+            track.urls[formatName],
             headers={'User-Agent': USER_AGENT_HEADER},
             timeout=30
         )
@@ -342,7 +355,9 @@ class Downloader:
             writepath = Path(currentFilename)
 
         if not trackAlreadyDownloaded or self.settings['overwriteFile'] == OverwriteOption.OVERWRITE:
-            track.downloadUrl = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, track.bitrate)
+            if formatsName[track.bitrate] not in track.urls:
+                track.urls[formatsName[track.bitrate]] = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, track.bitrate)
+            track.downloadUrl = track.urls[formatsName[track.bitrate]]
 
             try:
                 with open(writepath, 'wb') as stream:
@@ -415,6 +430,7 @@ class Downloader:
                     newTrack = self.dz.gw.get_track_with_fallback(track.fallbackID)
                     track.parseEssentialData(newTrack)
                     track.retriveFilesizes(self.dz)
+                    track.retriveTrackURLs(self.dz)
                     return self.downloadWrapper(extraData, track)
                 if not track.searched and self.settings['fallbackSearch']:
                     self.warn(itemData, error.errid, 'search')
@@ -423,6 +439,7 @@ class Downloader:
                         newTrack = self.dz.gw.get_track_with_fallback(searchedId)
                         track.parseEssentialData(newTrack)
                         track.retriveFilesizes(self.dz)
+                        track.retriveTrackURLs(self.dz)
                         track.searched = True
                         if self.listener: self.listener.send('queueUpdate', {
                             'uuid': self.downloadObject.uuid,

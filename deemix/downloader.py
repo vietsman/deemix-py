@@ -188,7 +188,7 @@ class Downloader:
                 self.afterDownloadCollection(tracks)
 
         if self.listener:
-            if self.listener:
+            if self.downloadObject.isCanceled:
                 self.listener.send('currentItemCancelled', self.downloadObject.uuid)
                 self.listener.send("removedFromQueue", self.downloadObject.uuid)
             else:

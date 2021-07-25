@@ -509,7 +509,7 @@ class Downloader:
 
         # Execute command after download
         if self.settings['executeCommand'] != "":
-            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.extrasPath))).replace("%filename%", quote(track['filename'])), shell=True)
+            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.extrasPath))).replace("%filename%", quote(track['filename'])))
 
     def afterDownloadCollection(self, tracks):
         if not self.extrasPath: self.extrasPath = Path(self.settings['downloadLocation'])
@@ -566,7 +566,7 @@ class Downloader:
 
         # Execute command after download
         if self.settings['executeCommand'] != "":
-            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.extrasPath))), shell=True)
+            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.extrasPath))))
 
 class DownloadError(Exception):
     """Base class for exceptions in this module."""

@@ -43,7 +43,7 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
     if downloadObject.isCanceled: raise DownloadCanceled
     headers= {'User-Agent': USER_AGENT_HEADER}
     chunkLength = start
-    isCryptedStream = "/mobile/" in track.downloadUrl
+    isCryptedStream = "/mobile/" in track.downloadURL or "/media/" in track.downloadURL
 
     itemData = {
         'id': track.id,
@@ -52,7 +52,7 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
     }
 
     try:
-        with get(track.downloadUrl, headers=headers, stream=True, timeout=10) as request:
+        with get(track.downloadURL, headers=headers, stream=True, timeout=10) as request:
             request.raise_for_status()
             if isCryptedStream:
                 blowfish_key = generateBlowfishKey(str(track.id))

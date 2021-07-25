@@ -361,7 +361,7 @@ class Downloader:
         if not trackAlreadyDownloaded or self.settings['overwriteFile'] == OverwriteOption.OVERWRITE:
             if formatsName[track.bitrate] not in track.urls:
                 track.urls[formatsName[track.bitrate]] = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, track.bitrate)
-            track.downloadUrl = track.urls[formatsName[track.bitrate]]
+            track.downloadURL = track.urls[formatsName[track.bitrate]]
 
             try:
                 with open(writepath, 'wb') as stream:

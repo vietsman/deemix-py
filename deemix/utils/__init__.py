@@ -120,13 +120,13 @@ def formatListener(key, data=None):
         if data['solution'] == 'search': solutionMessage = "Searching for alternative."
         return f"[{data['uuid']}] {data['data']['artist']} - {data['data']['title']} :: {errorMessage} {solutionMessage}"
     if key == "currentItemCancelled":
-        return f"Cancelled download of {data}"
+        return f"Current item cancelled ({data})"
     if key == "removedFromQueue":
-        return f"Removed {data} from the queue"
+        return f"[{data}] Removed from the queue"
     if key == "finishDownload":
-        return f"{data} finished downloading"
+        return f"[{data}] Finished downloading"
     if key == "startConversion":
-        return f"Started converting {data}"
+        return f"[{data}] Started converting"
     if key == "finishConversion":
-        return f"Finished converting {data}"
+        return f"[{data}] Finished converting"
     return ""

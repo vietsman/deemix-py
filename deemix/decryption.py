@@ -10,6 +10,7 @@ from deemix.utils.crypto import _md5, _ecbCrypt, _ecbDecrypt, generateBlowfishKe
 
 from deemix.utils import USER_AGENT_HEADER
 from deemix.types.DownloadObjects import Single
+from deemix.errors import DownloadCanceled, DownloadEmpty
 
 logger = logging.getLogger('deemix')
 
@@ -101,9 +102,3 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
     except (RequestsConnectionError, ReadTimeout, ChunkedEncodingError):
         sleep(2)
         streamTrack(outputStream, track, start, downloadObject, listener)
-
-class DownloadCanceled(Exception):
-    pass
-
-class DownloadEmpty(Exception):
-    pass

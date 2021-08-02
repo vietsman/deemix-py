@@ -1,9 +1,11 @@
 import logging
 
-from deemix.types.DownloadObjects import Single, Collection
-from deezer.gw import GWAPIError, LyricsStatus
-from deezer.api import APIError
+from deezer.gw import LyricsStatus
+from deezer.errors import GWAPIError, APIError
 from deezer.utils import map_user_playlist
+
+from deemix.types.DownloadObjects import Single, Collection
+from deemix.errors import GenerationError, ISRCnotOnDeezer, InvalidID, NotYourPrivatePlaylist
 
 logger = logging.getLogger('deemix')
 
@@ -263,45 +265,3 @@ def generateArtistTopItem(dz, link_id, bitrate):
 
     artistTopTracksAPI_gw = dz.gw.get_artist_toptracks(link_id)
     return generatePlaylistItem(dz, playlistAPI['id'], bitrate, playlistAPI=playlistAPI, playlistTracksAPI=artistTopTracksAPI_gw)
-
-class GenerationError(Exception):
-    def __init__(self, link, message, errid=None):
-        super().__init__()
-        self.link = link
-        self.message = message
-        self.errid = errid
-
-    def toDict(self):
-        return {
-            'link': self.link,
-            'error': self.message,
-            'errid': self.errid
-        }
-
-class ISRCnotOnDeezer(GenerationError):
-    def __init__(self, link):
-        super().__init__(link, "Track ISRC is not available on deezer", "ISRCnotOnDeezer")
-
-class NotYourPrivatePlaylist(GenerationError):
-    def __init__(self, link):
-        super().__init__(link, "You can't download others private playlists.", "notYourPrivatePlaylist")
-
-class TrackNotOnDeezer(GenerationError):
-    def __init__(self, link):
-        super().__init__(link, "Track not found on deezer!", "trackNotOnDeezer")
-
-class AlbumNotOnDeezer(GenerationError):
-    def __init__(self, link):
-        super().__init__(link, "Album not found on deezer!", "albumNotOnDeezer")
-
-class InvalidID(GenerationError):
-    def __init__(self, link):
-        super().__init__(link, "Link ID is invalid!", "invalidID")
-
-class LinkNotSupported(GenerationError):
-    def __init__(self, link):
-        super().__init__(link, "Link is not supported.", "unsupportedURL")
-
-class LinkNotRecognized(GenerationError):
-    def __init__(self, link):
-        super().__init__(link, "Link is not recognized.", "invalidURL")

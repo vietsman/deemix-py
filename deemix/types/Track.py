@@ -2,8 +2,8 @@ from time import sleep
 import re
 import requests
 
-from deezer.gw import GWAPIError
-from deezer.api import APIError
+from deezer.errors import APIError, GWAPIError
+from deemix.errors import TrackError, NoDataToParse, AlbumDoesntExists
 
 from deemix.utils import removeFeatures, andCommaConcat, removeDuplicateArtists, generateReplayGainString, changeCase
 
@@ -335,15 +335,3 @@ class Track:
                 self.artistsString = separator.join(self.artist['Main'])
             else:
                 self.artistsString = separator.join(self.artists)
-
-class TrackError(Exception):
-    """Base class for exceptions in this module."""
-
-class AlbumDoesntExists(TrackError):
-    pass
-
-class MD5NotFound(TrackError):
-    pass
-
-class NoDataToParse(TrackError):
-    pass

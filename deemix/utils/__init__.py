@@ -1,6 +1,7 @@
 import string
 from deezer import TrackFormats
 import os
+from deemix.errors import ErrorMessages
 
 USER_AGENT_HEADER = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) " \
                     "Chrome/79.0.3945.130 Safari/537.36"
@@ -73,3 +74,59 @@ def removeDuplicateArtists(artist, artists):
     for role in artist.keys():
         artist[role] = uniqueArray(artist[role])
     return (artist, artists)
+
+def formatListener(key, data=None):
+    if key == "startAddingArtist":
+        return f"Started gathering {data.name}'s albums ({data.id})"
+    if key == "finishAddingArtist":
+        return f"Finished gathering {data.name}'s albums ({data.id})"
+    if key == "updateQueue":
+        uuid = f"[{data['uuid']}]"
+        if data.get('downloaded'):
+            shortFilepath = data['downloadPath'][len(data['extrasPath']):]
+            return f"{uuid} Completed download of {shortFilepath}"
+        if data.get('failed'):
+            return f"{uuid} {data['data']['artist']} - {data['data']['title']} :: {data['error']}"
+        if data.get('progress'):
+            return f"{uuid} Download at {data['progress']}%"
+        if data.get('conversion'):
+            return f"{uuid} Conversion at {data['conversion']}%"
+        return uuid
+    if key == "downloadInfo":
+        message = data['state']
+        if data['state'] == "getTags": message = "Getting tags."
+        elif data['state'] == "gotTags": message = "Tags got."
+        elif data['state'] == "getBitrate": message = "Getting download URL."
+        elif data['state'] == "bitrateFallback": message = "Desired bitrate not found, falling back to lower bitrate."
+        elif data['state'] == "searchFallback": message = "This track has been searched for, result might not be 100% exact."
+        elif data['state'] == "gotBitrate": message = "Download URL got."
+        elif data['state'] == "getAlbumArt": message = "Downloading album art."
+        elif data['state'] == "gotAlbumArt": message = "Album art downloaded."
+        elif data['state'] == "downloading":
+            message = "Downloading track."
+            if data['alreadyStarted']:
+                message += f" Recovering download from {data['value']}."
+            else:
+                message += f" Downloading {data['value']} bytes."
+        elif data['state'] == "downloaded": message = "Track downloaded."
+        elif data['state'] == "alreadyDownloaded": message = "Track already downloaded."
+        elif data['state'] == "tagging": message = "Tagging track."
+        elif data['state'] == "tagged": message = "Track tagged."
+        return f"[{data['uuid']}] {data['data']['artist']} - {data['data']['title']} :: {message}"
+    if key == "downloadWarn":
+        errorMessage = ErrorMessages[data['state']]
+        solutionMessage = ""
+        if data['solution'] == 'fallback': solutionMessage = "Using fallback id."
+        if data['solution'] == 'search': solutionMessage = "Searching for alternative."
+        return f"[{data['uuid']}] {data['data']['artist']} - {data['data']['title']} :: {errorMessage} {solutionMessage}"
+    if key == "currentItemCancelled":
+        return f"Cancelled download of {data}"
+    if key == "removedFromQueue":
+        return f"Removed {data} from the queue"
+    if key == "finishDownload":
+        return f"{data} finished downloading"
+    if key == "startConversion":
+        return f"Started converting {data}"
+    if key == "finishConversion":
+        return f"Finished converting {data}"
+    return ""

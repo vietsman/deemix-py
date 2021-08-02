@@ -7,7 +7,7 @@ from deezer import TrackFormats
 
 from deemix import generateDownloadObject
 from deemix.settings import load as loadSettings
-from deemix.utils import getBitrateNumberFromText
+from deemix.utils import getBitrateNumberFromText, formatListener
 import deemix.utils.localpaths as localpaths
 from deemix.downloader import Downloader
 from deemix.itemgen import GenerationError
@@ -15,11 +15,9 @@ from deemix.plugins.spotify import Spotify
 
 class LogListener:
     @classmethod
-    def send(cls, key, value):
-        if value:
-            print(key, value)
-        else:
-            print(key)
+    def send(cls, key, value=None):
+        logString = formatListener(key, value)
+        if logString: print(logString)
 
 
 @click.command()

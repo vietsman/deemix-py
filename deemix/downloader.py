@@ -172,9 +172,9 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, 
             falledBack = True
             logger.info("%s Fallback to lower bitrate", f"[{track.mainArtist.name} - {track.title}]")
             if listener and uuid:
-                listener.send('queueUpdate', {
+                listener.send('downloadInfo', {
                     'uuid': uuid,
-                    'bitrateFallback': True,
+                    'state': 'bitrateFallback',
                     'data': {
                         'id': track.id,
                         'title': track.title,
@@ -472,15 +472,7 @@ class Downloader:
                         track.parseEssentialData(newTrack)
                         track.retriveFilesizes(self.dz)
                         track.searched = True
-                        if self.listener: self.listener.send('queueUpdate', {
-                            'uuid': self.downloadObject.uuid,
-                            'searchFallback': True,
-                            'data': {
-                                'id': track.id,
-                                'title': track.title,
-                                'artist': track.mainArtist.name
-                            },
-                        })
+                        self.log(itemData, "searchFallback")
                         return self.downloadWrapper(extraData, track)
                 error.errid += "NoAlternative"
                 error.message = ErrorMessages[error.errid]

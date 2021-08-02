@@ -18,7 +18,7 @@ from urllib3.exceptions import SSLError as u3SSLError
 from mutagen.flac import FLACNoHeaderError, error as FLACError
 
 from deezer import TrackFormats
-from deezer.errors import WrongLicense
+from deezer.errors import WrongLicense, WrongGeolocation
 from deemix.types.DownloadObjects import Single, Collection
 from deemix.types.Track import Track
 from deemix.types.Picture import StaticPicture
@@ -83,11 +83,14 @@ def downloadImage(url, path, overwrite=OverwriteOption.DONT_OVERWRITE):
         logger.exception("Error while downloading an image, you should report this to the developers: %s", e)
     return None
 
-def getPreferredBitrate(dz, track, bitrate, shouldFallback, currentUser, uuid=None, listener=None):
-    bitrate = int(bitrate)
+def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, listener=None):
+    preferredBitrate = int(preferredBitrate)
     if track.local: return TrackFormats.LOCAL
 
     falledBack = False
+    hasAlternative = track.fallbackID != "0"
+    isGeolocked = False
+    wrongLicense = False
 
     formats_non_360 = {
         TrackFormats.FLAC: "FLAC",
@@ -100,8 +103,7 @@ def getPreferredBitrate(dz, track, bitrate, shouldFallback, currentUser, uuid=No
         TrackFormats.MP4_RA1: "MP4_RA1",
     }
 
-    is360format = bitrate in formats_360.keys()
-
+    is360format = preferredBitrate in formats_360.keys()
     if not shouldFallback:
         formats = formats_360
         formats.update(formats_non_360)
@@ -110,13 +112,9 @@ def getPreferredBitrate(dz, track, bitrate, shouldFallback, currentUser, uuid=No
     else:
         formats = formats_non_360
 
-    def testBitrate(track, formatNumber, formatName):
-        if formatName not in track.urls:
-            url = dz.get_track_url(track.trackToken, formatName)
-            if not url: url = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, formatNumber)
-            track.urls[formatName] = url
+    def testURL(track, url, formatName):
         request = requests.head(
-            track.urls[formatName],
+            url,
             headers={'User-Agent': USER_AGENT_HEADER},
             timeout=30
         )
@@ -124,22 +122,51 @@ def getPreferredBitrate(dz, track, bitrate, shouldFallback, currentUser, uuid=No
             request.raise_for_status()
             track.filesizes[f"FILESIZE_{formatName}"] = int(request.headers["Content-Length"])
             track.filesizes[f"FILESIZE_{formatName}_TESTED"] = True
-            if track.filesizes[f"FILESIZE_{formatName}"] == 0: return None
-            return formatNumber
+            return track.filesizes[f"FILESIZE_{formatName}"] != 0
         except requests.exceptions.HTTPError: # if the format is not available, Deezer returns a 403 error
-            return None
+            return False
+
+    def getCorrectURL(track, formatName, formatNumber):
+        nonlocal wrongLicense, isGeolocked
+        # Check the track with the legit method
+        try:
+            url = dz.get_track_url(track.trackToken, formatName)
+            if testURL(track, url, formatName): return url
+            url = None
+        except (WrongLicense, WrongGeolocation) as e:
+            wrongLicense = isinstance(e, WrongLicense)
+            isGeolocked = isinstance(e, WrongGeolocation)
+        # Fallback to old method
+        if not url:
+            url = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, formatNumber)
+            if testURL(track, url, formatName): return url
+            url = None
+        return url
 
     for formatNumber, formatName in formats.items():
-        if formatNumber > bitrate: continue
-        if f"FILESIZE_{formatName}" in track.filesizes:
-            if int(track.filesizes[f"FILESIZE_{formatName}"]) != 0: return formatNumber
-            if not track.filesizes[f"FILESIZE_{formatName}_TESTED"]:
-                testedBitrate = testBitrate(track, formatNumber, formatName)
-                if testedBitrate: return testedBitrate
+        # Current bitrate is higher than preferred bitrate; skip
+        if formatNumber > preferredBitrate: continue
+
+        currentTrack = track
+        url = getCorrectURL(currentTrack, formatName, formatNumber)
+        newTrack = None
+        while True:
+            if not url and hasAlternative:
+                newTrack = dz.gw.get_track_with_fallback(currentTrack.fallbackID)
+                currentTrack = Track()
+                currentTrack.parseEssentialData(newTrack)
+                hasAlternative = currentTrack.fallbackID != "0"
+            if not url: getCorrectURL(currentTrack, formatName, formatNumber)
+            if (url or not hasAlternative): break
+
+        if url:
+            if newTrack: track.parseEssentialData(newTrack)
+            track.urls[formatName] = url
+            return formatNumber
 
         if not shouldFallback:
-            if formatName == "FLAC" and not currentUser['can_stream_lossless'] or formatName == "MP3_320" and not currentUser['can_stream_hq']:
-                raise WrongLicense(formatName)
+            if wrongLicense: raise WrongLicense(formatName)
+            if isGeolocked: raise WrongGeolocation(dz.current_user['country'])
             raise PreferredBitrateNotFound
         if not falledBack:
             falledBack = True
@@ -252,10 +279,12 @@ class Downloader:
                 track,
                 self.bitrate,
                 self.settings['fallbackBitrate'],
-                self.dz.current_user, self.downloadObject.uuid, self.listener
+                self.downloadObject.uuid, self.listener
             )
         except WrongLicense as e:
             raise DownloadFailed("wrongLicense") from e
+        except WrongGeolocation as e:
+            raise DownloadFailed("wrongGeolocation") from e
         except PreferredBitrateNotFound as e:
             raise DownloadFailed("wrongBitrate", track) from e
         except TrackNot360 as e:
@@ -363,12 +392,7 @@ class Downloader:
             writepath = Path(currentFilename)
 
         if not trackAlreadyDownloaded or self.settings['overwriteFile'] == OverwriteOption.OVERWRITE:
-            if formatsName[track.bitrate] not in track.urls:
-                url = self.dz.get_track_url(track.trackToken, formatsName[track.bitrate])
-                if not url: url = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, track.bitrate)
-                track.urls[formatsName[track.bitrate]] = url
             track.downloadURL = track.urls[formatsName[track.bitrate]]
-
             try:
                 with open(writepath, 'wb') as stream:
                     streamTrack(stream, track, downloadObject=self.downloadObject, listener=self.listener)

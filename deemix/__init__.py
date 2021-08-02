@@ -7,9 +7,8 @@ from deemix.itemgen import generateTrackItem, \
     generatePlaylistItem, \
     generateArtistItem, \
     generateArtistDiscographyItem, \
-    generateArtistTopItem, \
-    LinkNotRecognized, \
-    LinkNotSupported
+    generateArtistTopItem
+from deemix.errors import LinkNotRecognized, LinkNotSupported
 
 __version__ = "3.3.3"
 

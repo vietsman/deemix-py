@@ -5,7 +5,8 @@ import re
 from urllib.request import urlopen
 from deemix.plugins import Plugin
 from deemix.utils.localpaths import getConfigFolder
-from deemix.itemgen import generateTrackItem, generateAlbumItem, GenerationError, TrackNotOnDeezer, AlbumNotOnDeezer
+from deemix.itemgen import generateTrackItem, generateAlbumItem
+from deemix.errors import GenerationError, TrackNotOnDeezer, AlbumNotOnDeezer
 from deemix.types.DownloadObjects import Convertable
 
 import spotipy

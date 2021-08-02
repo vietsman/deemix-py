@@ -1,3 +1,5 @@
+from pathlib import Path
+
 class IDownloadObject:
     """DownloadObject Interface"""
     def __init__(self, obj):
@@ -14,6 +16,8 @@ class IDownloadObject:
         self.progress = obj.get('progress', 0)
         self.errors = obj.get('errors', [])
         self.files = obj.get('files', [])
+        self.extrasPath = obj.get('extrasPath')
+        if self.extrasPath: self.extrasPath = Path(self.extrasPath)
         self.progressNext = 0
         self.uuid = f"{self.type}_{self.id}_{self.bitrate}"
         self.isCanceled = False
@@ -35,6 +39,7 @@ class IDownloadObject:
             'progress': self.progress,
             'errors': self.errors,
             'files': self.files,
+            'extrasPath': str(self.extrasPath),
             '__type__': self.__type__
         }
 
@@ -65,7 +70,8 @@ class IDownloadObject:
             'artist': self.artist,
             'cover': self.cover,
             'explicit': self.explicit,
-            'size': self.size
+            'size': self.size,
+            'extrasPath': str(self.extrasPath)
         }
 
     def updateProgress(self, listener=None):

@@ -165,7 +165,6 @@ class Downloader:
         self.bitrate = downloadObject.bitrate
         self.listener = listener
 
-        self.extrasPath = None
         self.playlistCoverName = None
         self.playlistURLs = []
 
@@ -277,7 +276,7 @@ class Downloader:
         writepath = filepath / f"{filename}{extension}"
 
         # Save extrasPath
-        if extrasPath and not self.extrasPath: self.extrasPath = extrasPath
+        if extrasPath and not self.downloadObject.extrasPath: self.downloadObject.extrasPath = extrasPath
 
         # Generate covers URLs
         embeddedImageFormat = f'jpg-{self.settings["jpegImageQuality"]}'
@@ -405,12 +404,11 @@ class Downloader:
         if track.searched: returnData['searched'] = True
         self.downloadObject.downloaded += 1
         self.downloadObject.files.append(str(writepath))
-        self.downloadObject.extrasPath = str(self.extrasPath)
         if self.listener: self.listener.send("updateQueue", {
             'uuid': self.downloadObject.uuid,
             'downloaded': True,
             'downloadPath': str(writepath),
-            'extrasPath': str(self.extrasPath)
+            'extrasPath': str(self.downloadObject.extrasPath)
         })
         returnData['filename'] = str(writepath)[len(str(extrasPath))+ len(pathSep):]
         returnData['data'] = itemData
@@ -490,7 +488,7 @@ class Downloader:
         return result
 
     def afterDownloadSingle(self, track):
-        if not self.extrasPath: self.extrasPath = Path(self.settings['downloadLocation'])
+        if not self.downloadObject.extrasPath: self.downloadObject.extrasPath = Path(self.settings['downloadLocation'])
 
         # Save Album Cover
         if self.settings['saveArtwork'] and 'albumPath' in track:
@@ -505,7 +503,7 @@ class Downloader:
         # Create searched logfile
         if self.settings['logSearched'] and 'searched' in track:
             filename = f"{track.data.artist} - {track.data.title}"
-            with open(self.extrasPath / 'searched.txt', 'wb+') as f:
+            with open(self.downloadObject.extrasPath / 'searched.txt', 'wb+') as f:
                 searchedFile = f.read().decode('utf-8')
                 if not filename in searchedFile:
                     if searchedFile != "": searchedFile += "\r\n"
@@ -514,10 +512,10 @@ class Downloader:
 
         # Execute command after download
         if self.settings['executeCommand'] != "":
-            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.extrasPath))).replace("%filename%", quote(track['filename'])))
+            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.downloadObject.extrasPath))).replace("%filename%", quote(track['filename'])))
 
     def afterDownloadCollection(self, tracks):
-        if not self.extrasPath: self.extrasPath = Path(self.settings['downloadLocation'])
+        if not self.downloadObject.extrasPath: self.downloadObject.extrasPath = Path(self.settings['downloadLocation'])
         playlist = [None] * len(tracks)
         errors = ""
         searched = ""
@@ -549,26 +547,26 @@ class Downloader:
 
         # Create errors logfile
         if self.settings['logErrors'] and errors != "":
-            with open(self.extrasPath / 'errors.txt', 'wb') as f:
+            with open(self.downloadObject.extrasPath / 'errors.txt', 'wb') as f:
                 f.write(errors.encode('utf-8'))
 
         # Create searched logfile
         if self.settings['logSearched'] and searched != "":
-            with open(self.extrasPath / 'searched.txt', 'wb') as f:
+            with open(self.downloadObject.extrasPath / 'searched.txt', 'wb') as f:
                 f.write(searched.encode('utf-8'))
 
         # Save Playlist Artwork
         if self.settings['saveArtwork'] and self.playlistCoverName and not self.settings['tags']['savePlaylistAsCompilation']:
             for image in self.playlistURLs:
-                downloadImage(image['url'], self.extrasPath / f"{self.playlistCoverName}.{image['ext']}", self.settings['overwriteFile'])
+                downloadImage(image['url'], self.downloadObject.extrasPath / f"{self.playlistCoverName}.{image['ext']}", self.settings['overwriteFile'])
 
         # Create M3U8 File
         if self.settings['createM3U8File']:
             filename = generateDownloadObjectName(self.settings['playlistFilenameTemplate'], self.downloadObject, self.settings) or "playlist"
-            with open(self.extrasPath / f'{filename}.m3u8', 'wb') as f:
+            with open(self.downloadObject.extrasPath / f'{filename}.m3u8', 'wb') as f:
                 for line in playlist:
                     f.write((line + "\n").encode('utf-8'))
 
         # Execute command after download
         if self.settings['executeCommand'] != "":
-            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.extrasPath))))
+            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.downloadObject.extrasPath))))

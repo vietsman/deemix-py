@@ -113,6 +113,7 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, 
         formats = formats_non_360
 
     def testURL(track, url, formatName):
+        if not url: return False
         request = requests.head(
             url,
             headers={'User-Agent': USER_AGENT_HEADER},

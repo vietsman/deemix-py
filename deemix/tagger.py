@@ -12,14 +12,6 @@ def tagID3(path, track, save):
     except ID3NoHeaderError:
         tag = ID3()
 
-    rank = round((int(track.rank) / 10000) * 2.55)
-    if rank > 255 :
-        rank = 255
-    else:
-        rank = round(rank, 0)
-
-    tag.add(POPM(rating=rank))
-
     if save['title']:
         tag.add(TIT2(text=track.title))
 
@@ -106,6 +98,15 @@ def tagID3(path, track, save):
         tag.add(TXXX(desc="SOURCE", text='Deezer'))
         tag.add(TXXX(desc="SOURCEID", text=str(track.id)))
 
+    if save['rating']:
+        rank = round((int(track.rank) / 10000) * 2.55)
+        if rank > 255 :
+            rank = 255
+        else:
+            rank = round(rank, 0)
+
+        tag.add(POPM(rating=rank))
+
     if save['cover'] and track.album.embeddedCoverPath:
 
         descEncoding = Encoding.LATIN1
@@ -130,9 +131,6 @@ def tagFLAC(path, track, save):
     tag = FLAC(path)
     tag.delete()
     tag.clear_pictures()
-
-    rank = round((int(track.rank) / 10000))
-    tag['RATING'] = str(rank)
 
     if save['title']:
         tag["TITLE"] = track.title
@@ -209,6 +207,10 @@ def tagFLAC(path, track, save):
     if save['source']:
         tag["SOURCE"] = 'Deezer'
         tag["SOURCEID"] = str(track.id)
+
+    if save['rating']:
+        rank = round((int(track.rank) / 10000))
+        tag['RATING'] = str(rank)
 
     if save['cover'] and track.album.embeddedCoverPath:
         image = Picture()

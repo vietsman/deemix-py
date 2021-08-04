@@ -89,6 +89,7 @@ DEFAULTS = {
     "composer": False,
     "involvedPeople": False,
     "source": False,
+    "rating": False,
     "savePlaylistAsCompilation": False,
     "useNullSeparator": False,
     "saveID3v1": True,

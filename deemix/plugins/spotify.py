@@ -3,11 +3,12 @@ import json
 from pathlib import Path
 import re
 from urllib.request import urlopen
+from deezer.errors import DataException
 from deemix.plugins import Plugin
 from deemix.utils.localpaths import getConfigFolder
 from deemix.itemgen import generateTrackItem, generateAlbumItem
 from deemix.errors import GenerationError, TrackNotOnDeezer, AlbumNotOnDeezer
-from deemix.types.DownloadObjects import Convertable
+from deemix.types.DownloadObjects import Convertable, Collection
 
 import spotipy
 SpotifyClientCredentials = spotipy.oauth2.SpotifyClientCredentials
@@ -115,7 +116,7 @@ class Spotify(Plugin):
         playlistAPI = self._convertPlaylistStructure(spotifyPlaylist)
         playlistAPI['various_artist'] = dz.api.get_artist(5080) # Useful for save as compilation
 
-        tracklistTemp = spotifyPlaylist['track']['items']
+        tracklistTemp = spotifyPlaylist['tracks']['items']
         while spotifyPlaylist['tracks']['next']:
             spotifyPlaylist['tracks'] = self.sp.next(spotifyPlaylist['tracks'])
             tracklistTemp += spotifyPlaylist['tracks']['items']
@@ -182,6 +183,8 @@ class Spotify(Plugin):
 
     def convertTrack(self, dz, downloadObject, track, pos, conversion, conversionNext, cache, listener):
         if downloadObject.isCanceled: return
+        trackAPI = None
+        cachedTrack = None
 
         if track['id'] in cache['tracks']:
             cachedTrack = cache['tracks'][track['id']]
@@ -194,7 +197,7 @@ class Spotify(Plugin):
             try:
                 trackAPI = dz.api.get_track_by_ISRC(cachedTrack['isrc'])
                 if 'id' not in trackAPI or 'title' not in trackAPI: trackAPI = None
-            except GenerationError: pass
+            except DataException: pass
         if self.settings['fallbackSearch'] and not trackAPI:
             if 'id' not in cachedTrack or cachedTrack['id'] == "0":
                 trackID = dz.api.get_track_id_from_metadata(
@@ -208,6 +211,7 @@ class Spotify(Plugin):
                     self.saveCache(cache)
             if cachedTrack['id'] != "0": trackAPI = dz.api.get_track(cachedTrack['id'])
 
+        deezerTrack = None
         if not trackAPI:
             deezerTrack = {
                 'SNG_ID': "0",
@@ -231,6 +235,8 @@ class Spotify(Plugin):
             conversion = round(conversionNext)
             if listener: listener.send("updateQueue", {'uuid': downloadObject.uuid, 'conversion': conversion})
 
+        return deezerTrack
+
     def convert(self, dz, downloadObject, settings, listener=None):
         cache = self.loadCache()
 
@@ -238,6 +244,7 @@ class Spotify(Plugin):
         conversionNext = 0
 
         collection = [None] * len(downloadObject.conversion_data)
+        if listener: listener.send("startConversion", downloadObject.uuid)
         with ThreadPoolExecutor(settings['queueConcurrency']) as executor:
             for pos, track in enumerate(downloadObject.conversion_data, start=0):
                 collection[pos] = executor.submit(self.convertTrack,
@@ -245,7 +252,15 @@ class Spotify(Plugin):
                     track, pos,
                     conversion, conversionNext,
                     cache, listener
-                )
+                ).result()
+
+        downloadObject.collection['tracks_gw'] = collection
+        downloadObject.size = len(collection)
+        downloadObject = Collection(downloadObject.toDict())
+        if listener: listener.send("finishConversion", downloadObject.getSlimmedDict())
+
+        self.saveCache(cache)
+        return downloadObject
 
     @classmethod
     def _convertPlaylistStructure(cls, spotifyPlaylist):
@@ -274,6 +289,7 @@ class Spotify(Plugin):
             'picture_medium': cover or "https://e-cdns-images.dzcdn.net/images/cover/d41d8cd98f00b204e9800998ecf8427e/250x250-000000-80-0-0.jpg",
             'picture_big': cover or "https://e-cdns-images.dzcdn.net/images/cover/d41d8cd98f00b204e9800998ecf8427e/500x500-000000-80-0-0.jpg",
             'picture_xl': cover or "https://e-cdns-images.dzcdn.net/images/cover/d41d8cd98f00b204e9800998ecf8427e/1000x1000-000000-80-0-0.jpg",
+            'picture_thumbnail': cover or "https://e-cdns-images.dzcdn.net/images/cover/d41d8cd98f00b204e9800998ecf8427e/75x75-000000-80-0-0.jpg",
             'public': spotifyPlaylist['public'],
             'share': spotifyPlaylist['external_urls']['spotify'],
             'title': spotifyPlaylist['name'],

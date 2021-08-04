@@ -25,5 +25,5 @@ class StaticPicture:
     def __init__(self, url):
         self.staticURL = url
 
-    def getURL(self):
+    def getURL(self, _, __):
         return self.staticURL

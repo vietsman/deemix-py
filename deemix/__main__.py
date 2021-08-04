@@ -63,6 +63,8 @@ def download(url, bitrate, portable, path):
             else:
                 links.append(link)
 
+        downloadObjects = []
+
         for link in links:
             try:
                 downloadObject = generateDownloadObject(dz, link, bitrate, plugins, listener)
@@ -70,10 +72,15 @@ def download(url, bitrate, portable, path):
                 print(f"{e.link}: {e.message}")
                 continue
             if isinstance(downloadObject, list):
-                for obj in downloadObject:
-                    Downloader(dz, obj, settings, listener).start()
+                downloadObjects += downloadObject
             else:
-                Downloader(dz, downloadObject, settings, listener).start()
+                downloadObjects.append(downloadObject)
+
+        for obj in downloadObjects:
+            print(obj.__type__)
+            if obj.__type__ == "Convertable":
+                obj = plugins[obj.plugin].convert(dz, obj, settings, listener)
+            Downloader(dz, obj, settings, listener).start()
 
 
     if path is not None:

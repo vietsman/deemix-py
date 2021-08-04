@@ -1,7 +1,7 @@
 from mutagen.flac import FLAC, Picture
 from mutagen.id3 import ID3, ID3NoHeaderError, \
     TXXX, TIT2, TPE1, TALB, TPE2, TRCK, TPOS, TCON, TYER, TDAT, TLEN, TBPM, \
-    TPUB, TSRC, USLT, SYLT, APIC, IPLS, TCOM, TCOP, TCMP, Encoding, PictureType
+    TPUB, TSRC, USLT, SYLT, APIC, IPLS, TCOM, TCOP, TCMP, Encoding, PictureType, POPM
 
 # Adds tags to a MP3 file
 def tagID3(path, track, save):
@@ -11,6 +11,14 @@ def tagID3(path, track, save):
         tag.delete()
     except ID3NoHeaderError:
         tag = ID3()
+
+    rank = round((int(track.rank) / 10000) * 2.55)
+    if rank > 255 :
+        rank = 255
+    else:
+        rank = round(rank, 0)
+
+    tag.add(POPM(rating=rank))
 
     if save['title']:
         tag.add(TIT2(text=track.title))
@@ -122,6 +130,9 @@ def tagFLAC(path, track, save):
     tag = FLAC(path)
     tag.delete()
     tag.clear_pictures()
+
+    rank = round((int(track.rank) / 10000))
+    tag['RATING'] = str(rank)
 
     if save['title']:
         tag["TITLE"] = track.title

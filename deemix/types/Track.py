@@ -57,6 +57,7 @@ class Track:
         self.id = str(trackAPI_gw['SNG_ID'])
         self.duration = trackAPI_gw['DURATION']
         self.trackToken = trackAPI_gw['TRACK_TOKEN']
+        self.rank = trackAPI_gw['RANK_SNG']
         self.MD5 = trackAPI_gw.get('MD5_ORIGIN')
         if not self.MD5:
             if trackAPI and trackAPI.get('md5_origin'):

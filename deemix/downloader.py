@@ -129,6 +129,7 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, 
 
     def getCorrectURL(track, formatName, formatNumber):
         nonlocal wrongLicense, isGeolocked
+        url = None
         # Check the track with the legit method
         try:
             url = dz.get_track_url(track.trackToken, formatName)
@@ -441,10 +442,9 @@ class Downloader:
 
     def downloadWrapper(self, extraData, track=None):
         trackAPI_gw = extraData['trackAPI_gw']
-        if '_EXTRA_TRACK' in trackAPI_gw:
+        if trackAPI_gw.get('_EXTRA_TRACK'):
             extraData['trackAPI'] = trackAPI_gw['_EXTRA_TRACK'].copy()
             del extraData['trackAPI_gw']['_EXTRA_TRACK']
-            del trackAPI_gw['_EXTRA_TRACK']
         # Temp metadata to generate logs
         itemData = {
             'id': trackAPI_gw['SNG_ID'],

@@ -16,7 +16,7 @@ class IDownloadObject:
         self.progress = obj.get('progress', 0)
         self.errors = obj.get('errors', [])
         self.files = obj.get('files', [])
-        self.extrasPath = obj.get('extrasPath')
+        self.extrasPath = obj.get('extrasPath', "")
         if self.extrasPath: self.extrasPath = Path(self.extrasPath)
         self.progressNext = 0
         self.uuid = f"{self.type}_{self.id}_{self.bitrate}"

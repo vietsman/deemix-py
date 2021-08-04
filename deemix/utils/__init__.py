@@ -128,5 +128,5 @@ def formatListener(key, data=None):
     if key == "startConversion":
         return f"[{data}] Started converting"
     if key == "finishConversion":
-        return f"[{data}] Finished converting"
+        return f"[{data['uuid']}] Finished converting"
     return ""

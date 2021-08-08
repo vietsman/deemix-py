@@ -93,7 +93,10 @@ class Spotify(Plugin):
                     cachedTrack['id'] = trackID
                     cache['tracks'][link_id] = cachedTrack
                     self.saveCache(cache)
-            if cachedTrack['id'] != "0": return generateTrackItem(dz, cachedTrack['id'], bitrate)
+
+            if 'id' in cachedTrack and cachedTrack['id'] != "0":
+                return generateTrackItem(dz, cachedTrack['id'], bitrate)
+
         raise TrackNotOnDeezer(f"https://open.spotify.com/track/{link_id}")
 
     def generateAlbumItem(self, dz, link_id, bitrate):
@@ -209,7 +212,9 @@ class Spotify(Plugin):
                     cachedTrack['id'] = trackID
                     cache['tracks'][track['id']] = cachedTrack
                     self.saveCache(cache)
-            if cachedTrack['id'] != "0": trackAPI = dz.api.get_track(cachedTrack['id'])
+
+            if 'id' in cachedTrack and cachedTrack['id'] != "0":
+                trackAPI = dz.api.get_track(cachedTrack['id'])
 
         deezerTrack = None
         if not trackAPI:

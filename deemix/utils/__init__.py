@@ -77,9 +77,9 @@ def removeDuplicateArtists(artist, artists):
 
 def formatListener(key, data=None):
     if key == "startAddingArtist":
-        return f"Started gathering {data.name}'s albums ({data.id})"
+        return f"Started gathering {data['name']}'s albums ({data['id']})"
     if key == "finishAddingArtist":
-        return f"Finished gathering {data.name}'s albums ({data.id})"
+        return f"Finished gathering {data['name']}'s albums ({data['id']})"
     if key == "updateQueue":
         uuid = f"[{data['uuid']}]"
         if data.get('downloaded'):

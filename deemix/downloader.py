@@ -429,7 +429,6 @@ class Downloader:
 
         if track.searched: returnData['searched'] = True
         self.downloadObject.downloaded += 1
-        self.downloadObject.files.append(str(writepath))
         if self.listener: self.listener.send("updateQueue", {
             'uuid': self.downloadObject.uuid,
             'downloaded': True,
@@ -438,6 +437,8 @@ class Downloader:
         })
         returnData['filename'] = str(writepath)[len(str(extrasPath))+ len(pathSep):]
         returnData['data'] = itemData
+        returnData['path'] = str(writepath)
+        self.downloadObject.files.append(returnData)
         return returnData
 
     def downloadWrapper(self, extraData, track=None):

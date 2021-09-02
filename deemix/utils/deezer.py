@@ -19,7 +19,7 @@ def getAccessToken(email, password):
     ).json()
     return response.get('access_token')
 
-def getArtFromAccessToken(accessToken):
+def getArlFromAccessToken(accessToken):
     session = requests.Session()
     session.get(
         "https://api.deezer.com/platform/generic/track/3135556",

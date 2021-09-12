@@ -49,7 +49,7 @@ def download(url, bitrate, portable, path):
         f.write(arl)
 
     plugins = {
-        "spotify": Spotify()
+        "spotify": Spotify(configFolder=configFolder)
     }
     plugins["spotify"].setup()
 

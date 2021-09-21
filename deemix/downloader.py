@@ -86,32 +86,11 @@ def downloadImage(url, path, overwrite=OverwriteOption.DONT_OVERWRITE):
 
 def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, listener=None):
     preferredBitrate = int(preferredBitrate)
-    if track.local: return TrackFormats.LOCAL
 
     falledBack = False
     hasAlternative = track.fallbackID != "0"
     isGeolocked = False
     wrongLicense = False
-
-    formats_non_360 = {
-        TrackFormats.FLAC: "FLAC",
-        TrackFormats.MP3_320: "MP3_320",
-        TrackFormats.MP3_128: "MP3_128",
-    }
-    formats_360 = {
-        TrackFormats.MP4_RA3: "MP4_RA3",
-        TrackFormats.MP4_RA2: "MP4_RA2",
-        TrackFormats.MP4_RA1: "MP4_RA1",
-    }
-
-    is360format = preferredBitrate in formats_360.keys()
-    if not shouldFallback:
-        formats = formats_360
-        formats.update(formats_non_360)
-    elif is360format:
-        formats = formats_360
-    else:
-        formats = formats_non_360
 
     def testURL(track, url, formatName):
         if not url: return False
@@ -145,6 +124,31 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, 
             if testURL(track, url, formatName): return url
             url = None
         return url
+
+    if track.local:
+        url = getCorrectURL(track, "MP3_MISC", TrackFormats.LOCAL)
+        track.urls["MP3_MISC"] = url
+        return TrackFormats.LOCAL
+
+    formats_non_360 = {
+        TrackFormats.FLAC: "FLAC",
+        TrackFormats.MP3_320: "MP3_320",
+        TrackFormats.MP3_128: "MP3_128",
+    }
+    formats_360 = {
+        TrackFormats.MP4_RA3: "MP4_RA3",
+        TrackFormats.MP4_RA2: "MP4_RA2",
+        TrackFormats.MP4_RA1: "MP4_RA1",
+    }
+
+    is360format = preferredBitrate in formats_360.keys()
+    if not shouldFallback:
+        formats = formats_360
+        formats.update(formats_non_360)
+    elif is360format:
+        formats = formats_360
+    else:
+        formats = formats_non_360
 
     for formatNumber, formatName in formats.items():
         # Current bitrate is higher than preferred bitrate; skip
@@ -185,6 +189,8 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, 
                     },
                 })
     if is360format: raise TrackNot360
+    url = getCorrectURL(track, "MP3_MISC", TrackFormats.DEFAULT)
+    track.urls["MP3_MISC"] = url
     return TrackFormats.DEFAULT
 
 class Downloader:
@@ -396,6 +402,7 @@ class Downloader:
 
         if not trackAlreadyDownloaded or self.settings['overwriteFile'] == OverwriteOption.OVERWRITE:
             track.downloadURL = track.urls[formatsName[track.bitrate]]
+            if not track.downloadURL: raise DownloadFailed('notAvailable', track)
             try:
                 with open(writepath, 'wb') as stream:
                     streamTrack(stream, track, downloadObject=self.downloadObject, listener=self.listener)

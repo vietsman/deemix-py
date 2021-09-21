@@ -34,7 +34,13 @@ def changeCase(txt, case_type):
     if case_type == "upper":
         return txt.upper()
     if case_type == "start":
-        return string.capwords(txt)
+        txt = txt.split(" ")
+        for i, word in enumerate(txt):
+            if word[0] in ['(', '{', '[']:
+                txt[i] = word[0] + word[1:].capitalize()
+            else:
+                txt[i] = word.capitalize()
+        return " ".join(txt)
     if case_type == "sentence":
         return txt.capitalize()
     return str

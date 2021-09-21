@@ -11,7 +11,10 @@ from deemix.utils import getBitrateNumberFromText, formatListener
 import deemix.utils.localpaths as localpaths
 from deemix.downloader import Downloader
 from deemix.itemgen import GenerationError
-from deemix.plugins.spotify import Spotify
+try:
+    from deemix.plugins.spotify import Spotify
+except ImportError:
+    Spotify = None
 
 class LogListener:
     @classmethod
@@ -48,10 +51,12 @@ def download(url, bitrate, portable, path):
     with open(configFolder / '.arl', 'w') as f:
         f.write(arl)
 
-    plugins = {
-        "spotify": Spotify(configFolder=configFolder)
-    }
-    plugins["spotify"].setup()
+    plugins = {}
+    if Spotify:
+        plugins = {
+            "spotify": Spotify(configFolder=configFolder)
+        }
+        plugins["spotify"].setup()
 
     def downloadLinks(url, bitrate=None):
         if not bitrate: bitrate = settings.get("maxBitrate", TrackFormats.MP3_320)
@@ -77,7 +82,6 @@ def download(url, bitrate, portable, path):
                 downloadObjects.append(downloadObject)
 
         for obj in downloadObjects:
-            print(obj.__type__)
             if obj.__type__ == "Convertable":
                 obj = plugins[obj.plugin].convert(dz, obj, settings, listener)
             Downloader(dz, obj, settings, listener).start()

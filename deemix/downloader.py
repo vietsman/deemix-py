@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 from time import sleep
+import traceback
 
 from os.path import sep as pathSep
 from os import makedirs, system as execute
@@ -487,7 +488,8 @@ class Downloader:
             logger.exception("%s %s", f"{itemData['artist']} - {itemData['title']}", e)
             result = {'error': {
                 'message': str(e),
-                'data': itemData
+                'data': itemData,
+                'stack': traceback.format_exc()
             }}
 
         if 'error' in result:
@@ -501,7 +503,8 @@ class Downloader:
                     'failed': True,
                     'data': error['data'],
                     'error': error['message'],
-                    'errid': error['errid'] if 'errid' in error else None
+                    'errid': error['errid'] if 'errid' in error else None,
+                    'stack': error['stack'] if 'stack' in error else None
                 })
         return result
 

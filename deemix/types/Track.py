@@ -155,6 +155,9 @@ class Track:
             if self.album.date and not self.date: self.date = self.album.date
             if not self.album.discTotal: self.album.discTotal = albumAPI_gw.get('NUMBER_DISK', "1")
             if not self.copyright: self.copyright = albumAPI_gw['COPYRIGHT']
+            if 'GENRES' in trackAPI_gw:
+                for genre in trackAPI_gw['GENRES']:
+                    if genre not in self.album.genre: self.album.genre.push(genre)
             self.parseTrack(trackAPI)
 
         # Remove unwanted charaters in track name

@@ -21,7 +21,7 @@ def generateTrackItem(dz, link_id, bitrate, trackAPI=None, albumAPI=None):
             link_id = trackAPI['id']
         else:
             raise ISRCnotOnDeezer(f"https://deezer.com/track/{link_id}")
-    if not str(link_id.strip('-')).isdecimal(): raise InvalidID(f"https://deezer.com/track/{link_id}")
+    if not str(link_id).strip('-').isdecimal(): raise InvalidID(f"https://deezer.com/track/{link_id}")
 
     # Get essential track info
     try:

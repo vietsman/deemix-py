@@ -80,10 +80,17 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
                         'value': complete
                     })
 
+            isStart = True
             for chunk in request.iter_content(2048 * 3):
                 if isCryptedStream:
                     if len(chunk) >= 2048:
                         chunk = decryptChunk(blowfish_key, chunk[0:2048]) + chunk[2048:]
+                
+                if isStart and chunk[0] == 0:
+                    for i, byte in enumerate(chunk):
+                        if byte != 0: break
+                    chunk = chunk[i:]
+                isStart = False
 
                 outputStream.write(chunk)
                 chunkLength += len(chunk)

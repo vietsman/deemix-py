@@ -58,7 +58,7 @@ def tagID3(path, track, save):
         tag.add(TDAT(text=str(track.date.day) + str(track.date.month)))
     if save['length']:
         tag.add(TLEN(text=str(int(track.duration)*1000)))
-    if save['bpm']:
+    if save['bpm'] and track.bpm:
         tag.add(TBPM(text=str(track.bpm)))
     if save['label']:
         tag.add(TPUB(text=track.album.label))
@@ -177,7 +177,7 @@ def tagFLAC(path, track, save):
 
     if save['length']:
         tag["LENGTH"] = str(int(track.duration)*1000)
-    if save['bpm']:
+    if save['bpm'] and track.bpm:
         tag["BPM"] = str(track.bpm)
     if save['label']:
         tag["PUBLISHER"] = track.album.label

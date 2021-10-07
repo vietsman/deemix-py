@@ -1,5 +1,6 @@
 from concurrent.futures import ThreadPoolExecutor
 import json
+from copy import deepcopy
 from pathlib import Path
 import re
 from urllib.request import urlopen
@@ -309,7 +310,15 @@ class Spotify(Plugin):
                 json.dump({**self.credentials, **self.settings}, f, indent=2)
 
         with open(self.configFolder / 'settings.json', 'r') as settingsFile:
-            settings = json.load(settingsFile)
+            try:
+                settings = json.load(settingsFile)
+            except json.decoder.JSONDecodeError:
+                with open(self.configFolder / 'settings.json', 'w') as f:
+                    json.dump({**self.credentials, **self.settings}, f, indent=2)
+                settings = deepcopy({**self.credentials, **self.settings})
+            except Exception:
+                settings = deepcopy({**self.credentials, **self.settings})
+
         self.setSettings(settings)
         self.checkCredentials()
 

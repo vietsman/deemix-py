@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from pathlib import Path
 from os import makedirs
 from deezer import TrackFormats
@@ -113,7 +114,13 @@ def load(configFolder=None):
 
     # Read config file
     with open(configFolder / 'config.json', 'r') as configFile:
-        settings = json.load(configFile)
+        try:
+            settings = json.load(configFile)
+        except json.decoder.JSONDecodeError:
+            save(DEFAULTS, configFolder)
+            settings = deepcopy(DEFAULTS)
+        except Exception:
+            settings = deepcopy(DEFAULTS)
 
     if check(settings) > 0: save(settings, configFolder) # Check the settings and save them if something changed
     return settings

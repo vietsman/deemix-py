@@ -157,7 +157,7 @@ class Track:
             if not self.copyright: self.copyright = albumAPI_gw['COPYRIGHT']
             if 'GENRES' in trackAPI_gw:
                 for genre in trackAPI_gw['GENRES']:
-                    if genre not in self.album.genre: self.album.genre.push(genre)
+                    if genre not in self.album.genre: self.album.genre.append(genre)
             self.parseTrack(trackAPI)
 
         # Remove unwanted charaters in track name

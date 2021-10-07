@@ -41,7 +41,7 @@ def reverseStreamURL(url):
     return reverseStreamPath(urlPart)
 
 def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None):
-    if downloadObject.isCanceled: raise DownloadCanceled
+    if downloadObject and downloadObject.isCanceled: raise DownloadCanceled
     headers= {'User-Agent': USER_AGENT_HEADER}
     chunkLength = start
     isCryptedStream = "/mobile/" in track.downloadURL or "/media/" in track.downloadURL
@@ -85,7 +85,7 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
                 if isCryptedStream:
                     if len(chunk) >= 2048:
                         chunk = decryptChunk(blowfish_key, chunk[0:2048]) + chunk[2048:]
-                
+
                 if isStart and chunk[0] == 0:
                     for i, byte in enumerate(chunk):
                         if byte != 0: break

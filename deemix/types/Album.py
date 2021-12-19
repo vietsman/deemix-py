@@ -143,7 +143,7 @@ class Album:
         self.explicit = playlist.explicit
         self.date = playlist.date
         self.discTotal = playlist.discTotal
-        self.playlistId = playlist.playlistId
+        self.playlistID = playlist.playlistID
         self.owner = playlist.owner
         self.pic = playlist.pic
         self.isPlaylist = True

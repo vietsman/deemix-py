@@ -67,6 +67,7 @@ DEFAULTS = {
   "tags": {
     "title": True,
     "artist": True,
+    "artists": True,
     "album": True,
     "cover": True,
     "trackNumber": True,

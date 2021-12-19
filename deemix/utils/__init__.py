@@ -1,4 +1,5 @@
 import string
+import re
 from deezer import TrackFormats
 import os
 from deemix.errors import ErrorMessages
@@ -47,10 +48,18 @@ def changeCase(txt, case_type):
 
 def removeFeatures(title):
     clean = title
-    if "(feat." in clean.lower():
-        pos = clean.lower().find("(feat.")
+    found = False
+    pos = -1
+    if re.search(r"[\s(]?feat\.?\s", clean):
+        pos = re.search(r"[\s(]?feat\.?\s", clean).start(0)
+        found = True
+    if re.search(r"[\s(]?ft\.?\s", clean):
+        pos = re.search(r"[\s(]?ft\.?\s", clean).start(0)
+        found = True
+    openBracket = clean[pos] == '('
+    if found:
         tempTrack = clean[:pos]
-        if ")" in clean:
+        if ")" in clean and openBracket:
             tempTrack += clean[clean.find(")", pos + 1) + 1:]
         clean = tempTrack.strip()
         clean = ' '.join(clean.split())

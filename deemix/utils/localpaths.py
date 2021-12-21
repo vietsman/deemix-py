@@ -52,16 +52,19 @@ def getMusicFolder():
             musicdata = Path(os.path.expandvars(musicdata))
             musicdata = checkPath(musicdata)
     if os.name == 'nt' and musicdata == "":
-        musicKeys = ['My Music', '{4BD8D571-6D19-48D3-BE97-422220080E43}']
-        regData = os.popen(r'reg.exe query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"').read().split('\r\n')
-        for i, line in enumerate(regData):
-            if line == "": continue
-            if i == 1: continue
-            line = line.split('    ')
-            if line[1] in musicKeys:
-                musicdata = Path(line[3])
-                break
-        musicdata = checkPath(musicdata)
+        try:
+            musicKeys = ['My Music', '{4BD8D571-6D19-48D3-BE97-422220080E43}']
+            regData = os.popen(r'reg.exe query "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Shell Folders"').read().split('\r\n')
+            for i, line in enumerate(regData):
+                if line == "": continue
+                if i == 1: continue
+                line = line.split('    ')
+                if line[1] in musicKeys:
+                    musicdata = Path(line[3])
+                    break
+            musicdata = checkPath(musicdata)
+        except Exception:
+            musicdata = ""
     if musicdata == "":
         musicdata = homedata / 'Music'
         musicdata = checkPath(musicdata)

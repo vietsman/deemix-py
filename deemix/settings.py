@@ -105,7 +105,7 @@ def save(settings, configFolder=None):
     configFolder = Path(configFolder or localpaths.getConfigFolder())
     makedirs(configFolder, exist_ok=True) # Create config folder if it doesn't exsist
 
-    with open(configFolder / 'config.json', 'w') as configFile:
+    with open(configFolder / 'config.json', 'w', encoding="utf-8") as configFile:
         json.dump(settings, configFile, indent=2)
 
 def load(configFolder=None):
@@ -114,7 +114,7 @@ def load(configFolder=None):
     if not (configFolder / 'config.json').is_file(): save(DEFAULTS, configFolder) # Create config file if it doesn't exsist
 
     # Read config file
-    with open(configFolder / 'config.json', 'r') as configFile:
+    with open(configFolder / 'config.json', 'r', encoding="utf-8") as configFile:
         try:
             settings = json.load(configFile)
         except json.decoder.JSONDecodeError:

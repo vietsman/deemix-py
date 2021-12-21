@@ -306,14 +306,14 @@ class Spotify(Plugin):
 
     def loadSettings(self):
         if not (self.configFolder / 'settings.json').is_file():
-            with open(self.configFolder / 'settings.json', 'w') as f:
+            with open(self.configFolder / 'settings.json', 'w', encoding="utf-8") as f:
                 json.dump({**self.credentials, **self.settings}, f, indent=2)
 
-        with open(self.configFolder / 'settings.json', 'r') as settingsFile:
+        with open(self.configFolder / 'settings.json', 'r', encoding="utf-8") as settingsFile:
             try:
                 settings = json.load(settingsFile)
             except json.decoder.JSONDecodeError:
-                with open(self.configFolder / 'settings.json', 'w') as f:
+                with open(self.configFolder / 'settings.json', 'w', encoding="utf-8") as f:
                     json.dump({**self.credentials, **self.settings}, f, indent=2)
                 settings = deepcopy({**self.credentials, **self.settings})
             except Exception:
@@ -325,7 +325,7 @@ class Spotify(Plugin):
     def saveSettings(self, newSettings=None):
         if newSettings: self.setSettings(newSettings)
         self.checkCredentials()
-        with open(self.configFolder / 'settings.json', 'w') as f:
+        with open(self.configFolder / 'settings.json', 'w', encoding="utf-8") as f:
             json.dump({**self.credentials, **self.settings}, f, indent=2)
 
     def getSettings(self):
@@ -340,14 +340,14 @@ class Spotify(Plugin):
 
     def loadCache(self):
         if (self.configFolder / 'cache.json').is_file():
-            with open(self.configFolder / 'cache.json', 'r') as f:
+            with open(self.configFolder / 'cache.json', 'r', encoding="utf-8") as f:
                 cache = json.load(f)
         else:
             cache = {'tracks': {}, 'albums': {}}
         return cache
 
     def saveCache(self, newCache):
-        with open(self.configFolder / 'cache.json', 'w') as spotifyCache:
+        with open(self.configFolder / 'cache.json', 'w', encoding="utf-8") as spotifyCache:
             json.dump(newCache, spotifyCache)
 
     def checkCredentials(self):

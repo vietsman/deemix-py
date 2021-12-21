@@ -35,3 +35,4 @@ build
 *egg-info
 updatePyPi.sh
 deezer
+.cache

@@ -376,8 +376,8 @@ class Downloader:
         # Save lyrics in lrc file
         if self.settings['syncedLyrics'] and track.lyrics.sync:
             if not (filepath / f"{filename}.lrc").is_file() or self.settings['overwriteFile'] in [OverwriteOption.OVERWRITE, OverwriteOption.ONLY_TAGS]:
-                with open(filepath / f"{filename}.lrc", 'wb') as f:
-                    f.write(track.lyrics.sync.encode('utf-8'))
+                with open(filepath / f"{filename}.lrc", 'w', encoding="utf-8") as f:
+                    f.write(track.lyrics.sync)
 
         # Check for overwrite settings
         trackAlreadyDownloaded = writepath.is_file()
@@ -531,12 +531,12 @@ class Downloader:
         # Create searched logfile
         if self.settings['logSearched'] and 'searched' in track:
             filename = f"{track.data.artist} - {track.data.title}"
-            with open(self.downloadObject.extrasPath / 'searched.txt', 'wb+') as f:
-                searchedFile = f.read().decode('utf-8')
+            with open(self.downloadObject.extrasPath / 'searched.txt', 'w+', encoding="utf-8") as f:
+                searchedFile = f.read()
                 if not filename in searchedFile:
                     if searchedFile != "": searchedFile += "\r\n"
                     searchedFile += filename + "\r\n"
-                f.write(searchedFile.encode('utf-8'))
+                f.write(searchedFile)
 
         # Execute command after download
         if self.settings['executeCommand'] != "":
@@ -575,13 +575,13 @@ class Downloader:
 
         # Create errors logfile
         if self.settings['logErrors'] and errors != "":
-            with open(self.downloadObject.extrasPath / 'errors.txt', 'wb') as f:
-                f.write(errors.encode('utf-8'))
+            with open(self.downloadObject.extrasPath / 'errors.txt', 'w', encoding="utf-8") as f:
+                f.write(errors)
 
         # Create searched logfile
         if self.settings['logSearched'] and searched != "":
-            with open(self.downloadObject.extrasPath / 'searched.txt', 'wb') as f:
-                f.write(searched.encode('utf-8'))
+            with open(self.downloadObject.extrasPath / 'searched.txt', 'w', encoding="utf-8") as f:
+                f.write(searched)
 
         # Save Playlist Artwork
         if self.settings['saveArtwork'] and self.playlistCoverName and not self.settings['tags']['savePlaylistAsCompilation']:
@@ -591,9 +591,9 @@ class Downloader:
         # Create M3U8 File
         if self.settings['createM3U8File']:
             filename = generateDownloadObjectName(self.settings['playlistFilenameTemplate'], self.downloadObject, self.settings) or "playlist"
-            with open(self.downloadObject.extrasPath / f'{filename}.m3u8', 'wb') as f:
+            with open(self.downloadObject.extrasPath / f'{filename}.m3u8', 'w', encoding="utf-8") as f:
                 for line in playlist:
-                    f.write((line + "\n").encode('utf-8'))
+                    f.write(line + "\n")
 
         # Execute command after download
         if self.settings['executeCommand'] != "":

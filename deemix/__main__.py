@@ -44,11 +44,11 @@ def download(url, bitrate, portable, path):
         return arl
 
     if (configFolder / '.arl').is_file():
-        with open(configFolder / '.arl', 'r') as f:
+        with open(configFolder / '.arl', 'r', encoding="utf-8") as f:
             arl = f.readline().rstrip("\n").strip()
         if not dz.login_via_arl(arl): arl = requestValidArl()
     else: arl = requestValidArl()
-    with open(configFolder / '.arl', 'w') as f:
+    with open(configFolder / '.arl', 'w', encoding="utf-8") as f:
         f.write(arl)
 
     plugins = {}
@@ -101,7 +101,7 @@ def download(url, bitrate, portable, path):
         isfile = False
     if isfile:
         filename = url[0]
-        with open(filename) as f:
+        with open(filename, encoding="utf-8") as f:
             url = f.readlines()
 
     downloadLinks(url, bitrate)

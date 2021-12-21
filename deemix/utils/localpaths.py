@@ -44,7 +44,7 @@ def getMusicFolder():
         musicdata = Path(os.getenv("XDG_MUSIC_DIR"))
         musicdata = checkPath(musicdata)
     if (homedata / '.config' / 'user-dirs.dirs').is_file() and musicdata == "":
-        with open(homedata / '.config' / 'user-dirs.dirs', 'r') as f:
+        with open(homedata / '.config' / 'user-dirs.dirs', 'r', encoding="utf-8") as f:
             userDirs = f.read()
         musicdata_search = re.search(r"XDG_MUSIC_DIR=\"(.*)\"", userDirs)
         if musicdata_search:

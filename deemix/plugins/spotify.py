@@ -304,15 +304,15 @@ class Spotify(Plugin):
         return deezerPlaylist
 
     def loadSettings(self):
-        if not (self.configFolder / 'settings.json').is_file():
-            with open(self.configFolder / 'settings.json', 'w', encoding="utf-8") as f:
+        if not (self.configFolder / 'config.json').is_file():
+            with open(self.configFolder / 'config.json', 'w', encoding="utf-8") as f:
                 json.dump({**self.credentials, **self.settings}, f, indent=2)
 
-        with open(self.configFolder / 'settings.json', 'r', encoding="utf-8") as settingsFile:
+        with open(self.configFolder / 'config.json', 'r', encoding="utf-8") as settingsFile:
             try:
                 settings = json.load(settingsFile)
             except json.decoder.JSONDecodeError:
-                with open(self.configFolder / 'settings.json', 'w', encoding="utf-8") as f:
+                with open(self.configFolder / 'config.json', 'w', encoding="utf-8") as f:
                     json.dump({**self.credentials, **self.settings}, f, indent=2)
                 settings = deepcopy({**self.credentials, **self.settings})
             except Exception:
@@ -324,7 +324,7 @@ class Spotify(Plugin):
     def saveSettings(self, newSettings=None):
         if newSettings: self.setSettings(newSettings)
         self.checkCredentials()
-        with open(self.configFolder / 'settings.json', 'w', encoding="utf-8") as f:
+        with open(self.configFolder / 'config.json', 'w', encoding="utf-8") as f:
             json.dump({**self.credentials, **self.settings}, f, indent=2)
 
     def getSettings(self):

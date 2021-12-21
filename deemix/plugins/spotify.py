@@ -338,11 +338,17 @@ class Spotify(Plugin):
         self.settings = settings
 
     def loadCache(self):
+        cache = None
         if (self.configFolder / 'cache.json').is_file():
             with open(self.configFolder / 'cache.json', 'r', encoding="utf-8") as f:
-                cache = json.load(f)
-        else:
-            cache = {'tracks': {}, 'albums': {}}
+                try:
+                    cache = json.load(f)
+                except json.decoder.JSONDecodeError:
+                    self.saveCache({'tracks': {}, 'albums': {}})
+                    cache = None
+                except Exception:
+                    cache = None
+        if not cache: cache = {'tracks': {}, 'albums': {}}
         return cache
 
     def saveCache(self, newCache):

@@ -185,7 +185,7 @@ class Spotify(Plugin):
         }
         return cachedAlbum
 
-    def convertTrack(self, dz, downloadObject, track, pos, conversion, conversionNext, cache, listener):
+    def convertTrack(self, dz, downloadObject, track, pos, conversion, cache, listener):
         if downloadObject.isCanceled: return
         trackAPI = None
         cachedTrack = None
@@ -236,18 +236,17 @@ class Spotify(Plugin):
         deezerTrack['_EXTRA_TRACK'] = trackAPI
         deezerTrack['POSITION'] = pos+1
 
-        conversionNext += (1 / downloadObject.size) * 100
-        if round(conversionNext) != conversion and round(conversionNext) % 2 == 0:
-            conversion = round(conversionNext)
-            if listener: listener.send("updateQueue", {'uuid': downloadObject.uuid, 'conversion': conversion})
+        conversion['next'] += (1 / downloadObject.size) * 100
+        if round(conversion['next']) != conversion['now'] and round(conversion['next']) % 2 == 0:
+            conversion['now'] = round(conversion['next'])
+            if listener: listener.send("updateQueue", {'uuid': downloadObject.uuid, 'conversion': conversion['now']})
 
         return deezerTrack
 
     def convert(self, dz, downloadObject, settings, listener=None):
         cache = self.loadCache()
 
-        conversion = 0
-        conversionNext = 0
+        conversion = { 'now': 0, 'next': 0 }
 
         collection = [None] * len(downloadObject.conversion_data)
         if listener: listener.send("startConversion", downloadObject.uuid)
@@ -256,7 +255,7 @@ class Spotify(Plugin):
                 collection[pos] = executor.submit(self.convertTrack,
                     dz, downloadObject,
                     track, pos,
-                    conversion, conversionNext,
+                    conversion,
                     cache, listener
                 ).result()
 

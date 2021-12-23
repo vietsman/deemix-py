@@ -63,6 +63,7 @@ class Track:
         self.trackTokenExpiration = trackAPI['track_token_expire']
         self.MD5 = trackAPI.get('md5_origin')
         self.mediaVersion = trackAPI['media_version']
+        self.filesizes = trackAPI['filesizes']
         self.fallbackID = "0"
         if 'fallback_id' in trackAPI:
             self.fallbackID = trackAPI['fallback_id']

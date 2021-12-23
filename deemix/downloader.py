@@ -112,7 +112,11 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, feelingLuck
         nonlocal wrongLicense, isGeolocked
         url = None
         # Check the track with the legit method
-        if formatName.lower() in track.filesizes and track.filesizes[formatName.lower()] != "0":
+        wrongLicense = (
+            (formatName == "FLAC" or formatName.startswidth("MP4_RA")) and not dz.current_user.get('can_stream_lossless') or \
+            formatName == "MP3_320" and not dz.current_user.get('can_stream_hq')
+        )
+        if track.filesizes.get(formatName.lower()) and track.filesizes[formatName.lower()] != "0":
             try:
                 url = dz.get_track_url(track.trackToken, formatName)
             except (WrongLicense, WrongGeolocation) as e:

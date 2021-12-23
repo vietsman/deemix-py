@@ -91,7 +91,7 @@ class Album:
             self.date.year = release_date[0:4]
             self.date.fixDayMonth()
 
-        self.discTotal = albumAPI.get('nb_disk')
+        self.discTotal = albumAPI.get('nb_disk', "1")
         self.copyright = albumAPI.get('copyright')
 
         if self.pic.md5 == "":

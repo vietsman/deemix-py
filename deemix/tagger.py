@@ -90,7 +90,7 @@ def tagID3(path, track, save):
     if len(involved_people) > 0 and save['involvedPeople']:
         tag.add(IPLS(people=involved_people))
 
-    if save['copyright']:
+    if save['copyright'] and track.copyright:
         tag.add(TCOP(text=track.copyright))
     if save['savePlaylistAsCompilation'] and track.playlist or track.album.recordType == "compile":
         tag.add(TCMP(text="1"))
@@ -201,7 +201,7 @@ def tagFLAC(path, track, save):
         elif role == 'musicpublisher' and save['involvedPeople']:
             tag["ORGANIZATION"] = track.contributors['musicpublisher']
 
-    if save['copyright']:
+    if save['copyright'] and track.copyright:
         tag["COPYRIGHT"] = track.copyright
     if save['savePlaylistAsCompilation'] and track.playlist or track.album.recordType == "compile":
         tag["COMPILATION"] = "1"

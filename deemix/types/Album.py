@@ -77,7 +77,7 @@ class Album:
                 self.artist[artist['role']].append(artist['name'])
 
         self.trackTotal = albumAPI['nb_tracks']
-        self.recordType = albumAPI['record_type']
+        self.recordType = albumAPI.get('record_type', self.recordType)
 
         self.barcode = albumAPI.get('upc', self.barcode)
         self.label = albumAPI.get('label', self.label)
@@ -92,7 +92,7 @@ class Album:
             self.date.fixDayMonth()
 
         self.discTotal = albumAPI.get('nb_disk', "1")
-        self.copyright = albumAPI.get('copyright')
+        self.copyright = albumAPI.get('copyright', "")
 
         if self.pic.md5 == "":
             if albumAPI.get('md5_image'):

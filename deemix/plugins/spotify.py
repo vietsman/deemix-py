@@ -143,7 +143,7 @@ class Spotify(Plugin):
             'explicit': playlistAPI['explicit'],
             'size': len(tracklist),
             'collection': {
-                'tracks_gw': [],
+                'tracks': [],
                 'playlistAPI': playlistAPI
             },
             'plugin': 'spotify',
@@ -217,31 +217,31 @@ class Spotify(Plugin):
             if cachedTrack.get('id', "0") != "0":
                 trackAPI = dz.api.get_track(cachedTrack['id'])
 
-        deezerTrack = None
         if not trackAPI:
-            deezerTrack = {
-                'SNG_ID': "0",
-                'SNG_TITLE': track['name'],
-                'DURATION': 0,
-                'MD5_ORIGIN': 0,
-                'MEDIA_VERSION': 0,
-                'FILESIZE': 0,
-                'ALB_TITLE': track['album']['name'],
-                'ALB_PICTURE': "",
-                'ART_ID': 0,
-                'ART_NAME': track['artists'][0]['name']
+            trackAPI = {
+                'id': "0",
+                'title': track['name'],
+                'duration': 0,
+                'md5_origin': 0,
+                'media_version': 0,
+                'filesizes': {},
+                'album': {
+                    'title': track['album']['name'],
+                    'md5_image': ""
+                },
+                'artist': {
+                    'id': 0,
+                    'name': track['artists'][0]['name']
+                }
             }
-        else:
-            deezerTrack = dz.gw.get_track_with_fallback(trackAPI['id'])
-        deezerTrack['_EXTRA_TRACK'] = trackAPI
-        deezerTrack['POSITION'] = pos+1
+        trackAPI['position'] = pos+1
 
         conversion['next'] += (1 / downloadObject.size) * 100
         if round(conversion['next']) != conversion['now'] and round(conversion['next']) % 2 == 0:
             conversion['now'] = round(conversion['next'])
             if listener: listener.send("updateQueue", {'uuid': downloadObject.uuid, 'conversion': conversion['now']})
 
-        return deezerTrack
+        return trackAPI
 
     def convert(self, dz, downloadObject, settings, listener=None):
         cache = self.loadCache()
@@ -259,7 +259,7 @@ class Spotify(Plugin):
                     cache, listener
                 ).result()
 
-        downloadObject.collection['tracks_gw'] = collection
+        downloadObject.collection['tracks'] = collection
         downloadObject.size = len(collection)
         downloadObject = Collection(downloadObject.toDict())
         if listener: listener.send("finishConversion", downloadObject.getSlimmedDict())

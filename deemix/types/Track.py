@@ -1,9 +1,9 @@
-from time import sleep
 import re
-import requests
+from datetime import datetime
 
+from deezer.utils import map_track, map_album
 from deezer.errors import APIError, GWAPIError
-from deemix.errors import TrackError, NoDataToParse, AlbumDoesntExists
+from deemix.errors import NoDataToParse, AlbumDoesntExists
 
 from deemix.utils import removeFeatures, andCommaConcat, removeDuplicateArtists, generateReplayGainString, changeCase
 
@@ -24,8 +24,10 @@ class Track:
         self.MD5 = ""
         self.mediaVersion = ""
         self.trackToken = ""
+        self.trackTokenExpiration = 0
         self.duration = 0
         self.fallbackID = "0"
+        self.albumsFallback = []
         self.filesizes = {}
         self.local = False
         self.mainArtist = None
@@ -42,6 +44,7 @@ class Track:
         self.explicit = False
         self.ISRC = ""
         self.replayGain = ""
+        self.rank = 0
         self.playlist = None
         self.position = None
         self.searched = False
@@ -53,79 +56,54 @@ class Track:
         self.featArtistsString = ""
         self.urls = {}
 
-    def parseEssentialData(self, trackAPI_gw, trackAPI=None):
-        self.id = str(trackAPI_gw['SNG_ID'])
-        self.duration = trackAPI_gw['DURATION']
-        self.trackToken = trackAPI_gw['TRACK_TOKEN']
-        self.MD5 = trackAPI_gw.get('MD5_ORIGIN')
-        if not self.MD5:
-            if trackAPI and trackAPI.get('md5_origin'):
-                self.MD5 = trackAPI['md5_origin']
-            #else:
-            #    raise MD5NotFound
-        self.mediaVersion = trackAPI_gw['MEDIA_VERSION']
+    def parseEssentialData(self, trackAPI):
+        self.id = str(trackAPI['id'])
+        self.duration = trackAPI['duration']
+        self.trackToken = trackAPI['track_token']
+        self.trackTokenExpiration = trackAPI['track_token_expire']
+        self.MD5 = trackAPI.get('md5_origin')
+        self.mediaVersion = trackAPI['media_version']
         self.fallbackID = "0"
-        if 'FALLBACK' in trackAPI_gw:
-            self.fallbackID = trackAPI_gw['FALLBACK']['SNG_ID']
+        if 'fallback_id' in trackAPI:
+            self.fallbackID = trackAPI['fallback_id']
         self.local = int(self.id) < 0
         self.urls = {}
 
-    def retriveFilesizes(self, dz):
-        guest_sid = dz.session.cookies.get('sid')
-        try:
-            site = requests.post(
-                "https://api.deezer.com/1.0/gateway.php",
-                params={
-                    'api_key': "4VCYIJUCDLOUELGD1V8WBVYBNVDYOXEWSLLZDONGBBDFVXTZJRXPR29JRLQFO6ZE",
-                    'sid': guest_sid,
-                    'input': '3',
-                    'output': '3',
-                    'method': 'song_getData'
-                },
-                timeout=30,
-                json={'sng_id': self.id},
-                headers=dz.http_headers
-            )
-            result_json = site.json()
-        except:
-            sleep(2)
-            self.retriveFilesizes(dz)
-        if len(result_json['error']):
-            raise TrackError(result_json.dumps(result_json['error']))
-        response = result_json.get("results", {})
-        filesizes = {}
-        for key, value in response.items():
-            if key.startswith("FILESIZE_"):
-                filesizes[key] = int(value)
-                filesizes[key+"_TESTED"] = False
-        self.filesizes = filesizes
+    def parseData(self, dz, track_id=None, trackAPI=None, albumAPI=None, playlistAPI=None):
+        if track_id and (not trackAPI or trackAPI and not trackAPI.get('track_token')):
+            trackAPI_new = dz.gw.get_track_with_fallback(track_id)
+            trackAPI_new = map_track(trackAPI_new)
+            if not trackAPI: trackAPI = {}
+            trackAPI_new.update(trackAPI)
+            trackAPI = trackAPI_new
+        elif not trackAPI: raise NoDataToParse
 
-    def parseData(self, dz, track_id=None, trackAPI_gw=None, trackAPI=None, albumAPI_gw=None, albumAPI=None, playlistAPI=None):
-        if track_id and not trackAPI_gw: trackAPI_gw = dz.gw.get_track_with_fallback(track_id)
-        elif not trackAPI_gw: raise NoDataToParse
-        if not trackAPI:
-            try: trackAPI = dz.api.get_track(trackAPI_gw['SNG_ID'])
-            except APIError: trackAPI = None
+        self.parseEssentialData(trackAPI)
 
-        self.parseEssentialData(trackAPI_gw, trackAPI)
+        # only public api has bpm
+        if not trackAPI.get('bpm') and not self.local:
+            try:
+                trackAPI_new = dz.api.get_track(trackAPI['id'])
+                trackAPI_new['release_date'] = trackAPI['release_date']
+                trackAPI.update(trackAPI_new)
+            except APIError: pass
 
         if self.local:
-            self.parseLocalTrackData(trackAPI_gw)
+            self.parseLocalTrackData(trackAPI)
         else:
-            self.retriveFilesizes(dz)
-            self.parseTrackGW(trackAPI_gw)
+            self.parseTrack(trackAPI)
 
             # Get Lyrics data
-            if not "LYRICS" in trackAPI_gw and self.lyrics.id != "0":
-                try: trackAPI_gw["LYRICS"] = dz.gw.get_track_lyrics(self.id)
+            if not trackAPI.get("lyrics") and self.lyrics.id != "0":
+                try: trackAPI["lyrics"] = dz.gw.get_track_lyrics(self.id)
                 except GWAPIError: self.lyrics.id = "0"
-            if self.lyrics.id != "0": self.lyrics.parseLyrics(trackAPI_gw["LYRICS"])
+            if self.lyrics.id != "0": self.lyrics.parseLyrics(trackAPI["lyrics"])
 
             # Parse Album Data
             self.album = Album(
-                alb_id = trackAPI_gw['ALB_ID'],
-                title = trackAPI_gw['ALB_TITLE'],
-                pic_md5 = trackAPI_gw.get('ALB_PICTURE')
+                alb_id = trackAPI['album']['id'],
+                title = trackAPI['album']['title'],
+                pic_md5 = trackAPI['album'].get('md5_origin')
             )
 
             # Get album Data
@@ -134,31 +112,31 @@ class Track:
                 except APIError: albumAPI = None
 
             # Get album_gw Data
-            if not albumAPI_gw:
-                try: albumAPI_gw = dz.gw.get_album(self.album.id)
-                except GWAPIError: albumAPI_gw = None
+            # Only gw has disk number
+            if not albumAPI or albumAPI and not albumAPI.get('nb_disk'):
+                try:
+                    albumAPI_gw = dz.gw.get_album(self.album.id)
+                    albumAPI_gw = map_album(albumAPI_gw)
+                except GWAPIError: albumAPI_gw = {}
+                if not albumAPI: albumAPI = {}
+                albumAPI_gw.update(albumAPI)
+                albumAPI = albumAPI_gw
 
-            if albumAPI:
-                self.album.parseAlbum(albumAPI)
-            elif albumAPI_gw:
-                self.album.parseAlbumGW(albumAPI_gw)
-                # albumAPI_gw doesn't contain the artist cover
-                # Getting artist image ID
-                # ex: https://e-cdns-images.dzcdn.net/images/artist/f2bc007e9133c946ac3c3907ddc5d2ea/56x56-000000-80-0-0.jpg
+            if not albumAPI: raise AlbumDoesntExists
+
+            self.album.parseAlbum(albumAPI)
+            # albumAPI_gw doesn't contain the artist cover
+            # Getting artist image ID
+            # ex: https://e-cdns-images.dzcdn.net/images/artist/f2bc007e9133c946ac3c3907ddc5d2ea/56x56-000000-80-0-0.jpg
+            if not self.album.mainArtist.pic.md5 or self.album.mainArtist.pic.md5 == "":
                 artistAPI = dz.api.get_artist(self.album.mainArtist.id)
                 self.album.mainArtist.pic.md5 = artistAPI['picture_small'][artistAPI['picture_small'].find('artist/') + 7:-24]
-            else:
-                raise AlbumDoesntExists
 
             # Fill missing data
-            if albumAPI_gw: self.album.addExtraAlbumGWData(albumAPI_gw)
             if self.album.date and not self.date: self.date = self.album.date
-            if not self.album.discTotal: self.album.discTotal = albumAPI_gw.get('NUMBER_DISK', "1")
-            if not self.copyright: self.copyright = albumAPI_gw['COPYRIGHT']
-            if 'GENRES' in trackAPI_gw:
-                for genre in trackAPI_gw['GENRES']:
+            if 'genres' in trackAPI:
+                for genre in trackAPI['genres']:
                     if genre not in self.album.genre: self.album.genre.append(genre)
-            self.parseTrack(trackAPI)
 
         # Remove unwanted charaters in track name
         # Example: track/127793
@@ -168,7 +146,7 @@ class Track:
         if len(self.artist['Main']) == 0:
             self.artist['Main'] = [self.mainArtist.name]
 
-        self.position = trackAPI_gw.get('POSITION')
+        self.position = trackAPI.get('position')
 
         # Add playlist data if track is in a playlist
         if playlistAPI: self.playlist = Playlist(playlistAPI)
@@ -176,63 +154,52 @@ class Track:
         self.generateMainFeatStrings()
         return self
 
-    def parseLocalTrackData(self, trackAPI_gw):
+    def parseLocalTrackData(self, trackAPI):
         # Local tracks has only the trackAPI_gw page and
         # contains only the tags provided by the file
-        self.title = trackAPI_gw['SNG_TITLE']
-        self.album = Album(title=trackAPI_gw['ALB_TITLE'])
+        self.title = trackAPI['title']
+        self.album = Album(title=trackAPI['album']['title'])
         self.album.pic = Picture(
-            md5 = trackAPI_gw.get('ALB_PICTURE', ""),
+            md5 = trackAPI.get('md5_image', ""),
             pic_type = "cover"
         )
-        self.mainArtist = Artist(name=trackAPI_gw['ART_NAME'], role="Main")
-        self.artists = [trackAPI_gw['ART_NAME']]
+        self.mainArtist = Artist(name=trackAPI['artist']['name'], role="Main")
+        self.artists = [trackAPI['artist']['name']]
         self.artist = {
-            'Main': [trackAPI_gw['ART_NAME']]
+            'Main': [trackAPI['artist']['name']]
         }
         self.album.artist = self.artist
         self.album.artists = self.artists
         self.album.date = self.date
         self.album.mainArtist = self.mainArtist
 
-    def parseTrackGW(self, trackAPI_gw):
-        self.title = trackAPI_gw['SNG_TITLE'].strip()
-        if trackAPI_gw.get('VERSION') and not trackAPI_gw['VERSION'].strip() in self.title:
-            self.title += f" {trackAPI_gw['VERSION'].strip()}"
-
-        self.discNumber = trackAPI_gw.get('DISK_NUMBER')
-        self.explicit = bool(int(trackAPI_gw.get('EXPLICIT_LYRICS', "0")))
-        self.copyright = trackAPI_gw.get('COPYRIGHT')
-        if 'GAIN' in trackAPI_gw: self.replayGain = generateReplayGainString(trackAPI_gw['GAIN'])
-        self.ISRC = trackAPI_gw.get('ISRC')
-        self.trackNumber = trackAPI_gw['TRACK_NUMBER']
-        self.contributors = trackAPI_gw['SNG_CONTRIBUTORS']
-        self.rank = trackAPI_gw['RANK_SNG']
-
-        self.lyrics = Lyrics(trackAPI_gw.get('LYRICS_ID', "0"))
-
-        self.mainArtist = Artist(
-            art_id = trackAPI_gw['ART_ID'],
-            name = trackAPI_gw['ART_NAME'],
-            role = "Main",
-            pic_md5 = trackAPI_gw.get('ART_PICTURE')
-        )
-
-        if 'PHYSICAL_RELEASE_DATE' in trackAPI_gw:
-            self.date.day = trackAPI_gw["PHYSICAL_RELEASE_DATE"][8:10]
-            self.date.month = trackAPI_gw["PHYSICAL_RELEASE_DATE"][5:7]
-            self.date.year = trackAPI_gw["PHYSICAL_RELEASE_DATE"][0:4]
-            self.date.fixDayMonth()
-
     def parseTrack(self, trackAPI):
+        self.title = trackAPI['title']
+
+        self.discNumber = trackAPI.get('disk_number')
+        self.explicit = trackAPI.get('explicit_lyrics', False)
+        self.copyright = trackAPI.get('copyright')
+        if 'gain' in trackAPI: self.replayGain = generateReplayGainString(trackAPI['gain'])
+        self.ISRC = trackAPI.get('isrc')
+        self.trackNumber = trackAPI['track_position']
+        self.contributors = trackAPI.get('song_contributors')
+        self.rank = trackAPI['rank']
         self.bpm = trackAPI['bpm']
 
-        if not self.replayGain and 'gain' in trackAPI:
-            self.replayGain = generateReplayGainString(trackAPI['gain'])
-        if not self.explicit:
-            self.explicit = trackAPI['explicit_lyrics']
-        if not self.discNumber:
-            self.discNumber = trackAPI['disk_number']
+        self.lyrics = Lyrics(trackAPI.get('lyrics_id', "0"))
+
+        self.mainArtist = Artist(
+            art_id = trackAPI['artist']['id'],
+            name = trackAPI['artist']['name'],
+            role = "Main",
+            pic_md5 = trackAPI['artist'].get('md5_image')
+        )
+
+        if 'physical_release_date' in trackAPI:
+            self.date.day = trackAPI["physical_release_date"][8:10]
+            self.date.month = trackAPI["physical_release_date"][5:7]
+            self.date.year = trackAPI["physical_release_date"][0:4]
+            self.date.fixDayMonth()
 
         for artist in trackAPI['contributors']:
             isVariousArtists = str(artist['id']) == VARIOUS_ARTISTS
@@ -248,6 +215,11 @@ class Track:
                 if not artist['role'] in self.artist:
                     self.artist[artist['role']] = []
                 self.artist[artist['role']].append(artist['name'])
+
+        if 'alternative_albums' in trackAPI and trackAPI['alternative_albums']:
+            for album in trackAPI['alternative_albums']['data']:
+                if 'RIGHTS' in album and album['RIGHTS'].get('STREAM_ADS_AVAILABLE') or album['RIGHTS'].get('STREAM_SUB_AVAILABLE'):
+                    self.albumsFallback.append(album['ALB_ID'])
 
     def removeDuplicateArtists(self):
         (self.artist, self.artists) = removeDuplicateArtists(self.artist, self.artists)
@@ -266,6 +238,14 @@ class Track:
         self.featArtistsString = ""
         if 'Featured' in self.artist:
             self.featArtistsString = "feat. "+andCommaConcat(self.artist['Featured'])
+
+    def checkAndRenewTrackToken(self, dz):
+        now = datetime.now()
+        expiration = datetime.fromtimestamp(self.trackTokenExpiration)
+        if now > expiration:
+            newTrack = dz.gw.get_track_with_fallback(self.id)
+            self.trackToken = newTrack['TRACK_TOKEN']
+            self.trackTokenExpiration = newTrack['TRACK_TOKEN_EXPIRE']
 
     def applySettings(self, settings):
 

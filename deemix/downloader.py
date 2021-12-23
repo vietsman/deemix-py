@@ -20,6 +20,7 @@ from mutagen.flac import FLACNoHeaderError, error as FLACError
 
 from deezer import TrackFormats
 from deezer.errors import WrongLicense, WrongGeolocation
+from deezer.utils import map_track
 from deemix.types.DownloadObjects import Single, Collection
 from deemix.types.Track import Track
 from deemix.types.Picture import StaticPicture
@@ -74,7 +75,7 @@ def downloadImage(url, path, overwrite=OverwriteOption.DONT_OVERWRITE):
             pictureSize = int(pictureUrl[:pictureUrl.find("x")])
             if pictureSize > 1200:
                 return downloadImage(urlBase+pictureUrl.replace(f"{pictureSize}x{pictureSize}", '1200x1200'), path, overwrite)
-    except (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError, u3SSLError) as e:
+    except (requests.exceptions.ConnectionError, requests.exceptions.ChunkedEncodingError, u3SSLError):
         if path.is_file(): path.unlink()
         sleep(5)
         return downloadImage(url, path, overwrite)
@@ -84,7 +85,7 @@ def downloadImage(url, path, overwrite=OverwriteOption.DONT_OVERWRITE):
         logger.exception("Error while downloading an image, you should report this to the developers: %s", e)
     return None
 
-def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, listener=None):
+def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, feelingLucky, uuid=None, listener=None):
     preferredBitrate = int(preferredBitrate)
 
     falledBack = False
@@ -101,32 +102,31 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, 
         )
         try:
             request.raise_for_status()
-            track.filesizes[f"FILESIZE_{formatName}"] = int(request.headers["Content-Length"])
-            track.filesizes[f"FILESIZE_{formatName}_TESTED"] = True
-            return track.filesizes[f"FILESIZE_{formatName}"] != 0
+            track.filesizes[f"{formatName.lower()}"] = int(request.headers["Content-Length"])
+            track.filesizes[f"{formatName.lower()}_TESTED"] = True
+            return track.filesizes[f"{formatName.lower()}"] != 0
         except requests.exceptions.HTTPError: # if the format is not available, Deezer returns a 403 error
             return False
 
-    def getCorrectURL(track, formatName, formatNumber):
+    def getCorrectURL(track, formatName, formatNumber, feelingLucky):
         nonlocal wrongLicense, isGeolocked
         url = None
         # Check the track with the legit method
-        try:
-            url = dz.get_track_url(track.trackToken, formatName)
-            if testURL(track, url, formatName): return url
-            url = None
-        except (WrongLicense, WrongGeolocation) as e:
-            wrongLicense = isinstance(e, WrongLicense)
-            isGeolocked = isinstance(e, WrongGeolocation)
+        if formatName.lower() in track.filesizes and track.filesizes[formatName.lower()] != "0":
+            try:
+                url = dz.get_track_url(track.trackToken, formatName)
+            except (WrongLicense, WrongGeolocation) as e:
+                wrongLicense = isinstance(e, WrongLicense)
+                isGeolocked = isinstance(e, WrongGeolocation)
         # Fallback to old method
-        if not url:
+        if not url and feelingLucky:
             url = generateCryptedStreamURL(track.id, track.MD5, track.mediaVersion, formatNumber)
             if testURL(track, url, formatName): return url
             url = None
         return url
 
     if track.local:
-        url = getCorrectURL(track, "MP3_MISC", TrackFormats.LOCAL)
+        url = getCorrectURL(track, "MP3_MISC", TrackFormats.LOCAL, feelingLucky)
         track.urls["MP3_MISC"] = url
         return TrackFormats.LOCAL
 
@@ -150,20 +150,23 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, 
     else:
         formats = formats_non_360
 
+    # check and renew trackToken before starting the check
+    track.checkAndRenewTrackToken(dz)
     for formatNumber, formatName in formats.items():
         # Current bitrate is higher than preferred bitrate; skip
         if formatNumber > preferredBitrate: continue
 
         currentTrack = track
-        url = getCorrectURL(currentTrack, formatName, formatNumber)
+        url = getCorrectURL(currentTrack, formatName, formatNumber, feelingLucky)
         newTrack = None
         while True:
             if not url and hasAlternative:
                 newTrack = dz.gw.get_track_with_fallback(currentTrack.fallbackID)
+                newTrack = map_track(newTrack)
                 currentTrack = Track()
                 currentTrack.parseEssentialData(newTrack)
                 hasAlternative = currentTrack.fallbackID != "0"
-            if not url: getCorrectURL(currentTrack, formatName, formatNumber)
+            if not url: getCorrectURL(currentTrack, formatName, formatNumber, feelingLucky)
             if (url or not hasAlternative): break
 
         if url:
@@ -189,7 +192,7 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, uuid=None, 
                     },
                 })
     if is360format: raise TrackNot360
-    url = getCorrectURL(track, "MP3_MISC", TrackFormats.DEFAULT)
+    url = getCorrectURL(track, "MP3_MISC", TrackFormats.DEFAULT, feelingLucky)
     track.urls["MP3_MISC"] = url
     return TrackFormats.DEFAULT
 
@@ -208,17 +211,16 @@ class Downloader:
         if not self.downloadObject.isCanceled:
             if isinstance(self.downloadObject, Single):
                 track = self.downloadWrapper({
-                    'trackAPI_gw': self.downloadObject.single['trackAPI_gw'],
                     'trackAPI': self.downloadObject.single.get('trackAPI'),
                     'albumAPI': self.downloadObject.single.get('albumAPI')
                 })
                 if track: self.afterDownloadSingle(track)
             elif isinstance(self.downloadObject, Collection):
-                tracks = [None] * len(self.downloadObject.collection['tracks_gw'])
+                tracks = [None] * len(self.downloadObject.collection['tracks'])
                 with ThreadPoolExecutor(self.settings['queueConcurrency']) as executor:
-                    for pos, track in enumerate(self.downloadObject.collection['tracks_gw'], start=0):
+                    for pos, track in enumerate(self.downloadObject.collection['tracks'], start=0):
                         tracks[pos] = executor.submit(self.downloadWrapper, {
-                            'trackAPI_gw': track,
+                            'trackAPI': track,
                             'albumAPI': self.downloadObject.collection.get('albumAPI'),
                             'playlistAPI': self.downloadObject.collection.get('playlistAPI')
                         })
@@ -241,17 +243,17 @@ class Downloader:
 
     def download(self, extraData, track=None):
         returnData = {}
-        trackAPI_gw = extraData['trackAPI_gw']
         trackAPI = extraData.get('trackAPI')
         albumAPI = extraData.get('albumAPI')
         playlistAPI = extraData.get('playlistAPI')
+        trackAPI['size'] = self.downloadObject.size
         if self.downloadObject.isCanceled: raise DownloadCanceled
-        if trackAPI_gw['SNG_ID'] == "0": raise DownloadFailed("notOnDeezer")
+        if int(trackAPI['id']) == 0: raise DownloadFailed("notOnDeezer")
 
         itemData = {
-            'id': trackAPI_gw['SNG_ID'],
-            'title': trackAPI_gw['SNG_TITLE'].strip(),
-            'artist': trackAPI_gw['ART_NAME']
+            'id': trackAPI['id'],
+            'title': trackAPI['title'],
+            'artist': trackAPI['artist']['name']
         }
 
         # Create Track object
@@ -260,7 +262,7 @@ class Downloader:
             try:
                 track = Track().parseData(
                     dz=self.dz,
-                    trackAPI_gw=trackAPI_gw,
+                    track_id=trackAPI['id'],
                     trackAPI=trackAPI,
                     albumAPI=albumAPI,
                     playlistAPI=playlistAPI
@@ -287,13 +289,13 @@ class Downloader:
                 self.dz,
                 track,
                 self.bitrate,
-                self.settings['fallbackBitrate'],
+                self.settings['fallbackBitrate'], self.settings['feelingLucky'],
                 self.downloadObject.uuid, self.listener
             )
         except WrongLicense as e:
             raise DownloadFailed("wrongLicense") from e
         except WrongGeolocation as e:
-            raise DownloadFailed("wrongGeolocation") from e
+            raise DownloadFailed("wrongGeolocation", track) from e
         except PreferredBitrateNotFound as e:
             raise DownloadFailed("wrongBitrate", track) from e
         except TrackNot360 as e:
@@ -432,7 +434,7 @@ class Downloader:
                     self.downloadObject.removeTrackProgress(self.listener)
                     track.filesizes['FILESIZE_FLAC'] = "0"
                     track.filesizes['FILESIZE_FLAC_TESTED'] = True
-                    return self.download(trackAPI_gw, track=track)
+                    return self.download(extraData, track=track)
             self.log(itemData, "tagged")
 
         if track.searched: returnData['searched'] = True
@@ -450,18 +452,13 @@ class Downloader:
         return returnData
 
     def downloadWrapper(self, extraData, track=None):
-        trackAPI_gw = extraData['trackAPI_gw']
-        if trackAPI_gw.get('_EXTRA_TRACK'):
-            extraData['trackAPI'] = trackAPI_gw['_EXTRA_TRACK'].copy()
-            del extraData['trackAPI_gw']['_EXTRA_TRACK']
+        trackAPI = extraData['trackAPI']
         # Temp metadata to generate logs
         itemData = {
-            'id': trackAPI_gw['SNG_ID'],
-            'title': trackAPI_gw['SNG_TITLE'].strip(),
-            'artist': trackAPI_gw['ART_NAME']
+            'id': trackAPI['id'],
+            'title': trackAPI['title'],
+            'artist': trackAPI['artist']['name']
         }
-        if trackAPI_gw.get('VERSION') and trackAPI_gw['VERSION'] not in trackAPI_gw['SNG_TITLE']:
-            itemData['title'] += f" {trackAPI_gw['VERSION']}".strip()
 
         try:
             result = self.download(extraData, track)
@@ -471,16 +468,30 @@ class Downloader:
                 if track.fallbackID != "0":
                     self.warn(itemData, error.errid, 'fallback')
                     newTrack = self.dz.gw.get_track_with_fallback(track.fallbackID)
+                    newTrack = map_track(newTrack)
                     track.parseEssentialData(newTrack)
-                    track.retriveFilesizes(self.dz)
                     return self.downloadWrapper(extraData, track)
+                if len(track.albumsFallback) != 0 and self.settings.fallbackISRC:
+                    newAlbumID = track.albumsFallback.pop()
+                    newAlbum = self.dz.gw.get_album_page(newAlbumID)
+                    fallbackID = 0
+                    for newTrack in newAlbum['SONGS']['data']:
+                        if newTrack['ISRC'] == track.ISRC:
+                            fallbackID = newTrack['SNG_ID']
+                            break
+                    if fallbackID != 0:
+                        self.warn(itemData, error.errid, 'fallback')
+                        newTrack = self.dz.gw.get_track_with_fallback(fallbackID)
+                        newTrack = map_track(newTrack)
+                        track.parseEssentialData(newTrack)
+                        return self.downloadWrapper(extraData, track)
                 if not track.searched and self.settings['fallbackSearch']:
                     self.warn(itemData, error.errid, 'search')
                     searchedId = self.dz.api.get_track_id_from_metadata(track.mainArtist.name, track.title, track.album.title)
                     if searchedId != "0":
                         newTrack = self.dz.gw.get_track_with_fallback(searchedId)
+                        newTrack = map_track(newTrack)
                         track.parseEssentialData(newTrack)
-                        track.retriveFilesizes(self.dz)
                         track.searched = True
                         self.log(itemData, "searchFallback")
                         return self.downloadWrapper(extraData, track)

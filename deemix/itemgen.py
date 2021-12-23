@@ -1,8 +1,7 @@
 import logging
 
-from deezer.gw import LyricsStatus
 from deezer.errors import GWAPIError, APIError
-from deezer.utils import map_user_playlist
+from deezer.utils import map_user_playlist, map_track, map_album
 
 from deemix.types.DownloadObjects import Single, Collection
 from deemix.errors import GenerationError, ISRCnotOnDeezer, InvalidID, NotYourPrivatePlaylist
@@ -10,40 +9,44 @@ from deemix.errors import GenerationError, ISRCnotOnDeezer, InvalidID, NotYourPr
 logger = logging.getLogger('deemix')
 
 def generateTrackItem(dz, link_id, bitrate, trackAPI=None, albumAPI=None):
-    # Check if is an isrc: url
-    if str(link_id).startswith("isrc"):
-        try:
-            trackAPI = dz.api.get_track(link_id)
-        except APIError as e:
-            raise GenerationError(f"https://deezer.com/track/{link_id}", str(e)) from e
+    # Get essential track info
+    if not trackAPI:
+        if str(link_id).startswith("isrc") or int(link_id) > 0:
+            try:
+                trackAPI = dz.api.get_track(link_id)
+            except APIError as e:
+                raise GenerationError(f"https://deezer.com/track/{link_id}", str(e)) from e
 
-        if 'id' in trackAPI and 'title' in trackAPI:
-            link_id = trackAPI['id']
+            # Check if is an isrc: url
+            if str(link_id).startswith("isrc"):
+                if 'id' in trackAPI and 'title' in trackAPI:
+                    link_id = trackAPI['id']
+                else:
+                    raise ISRCnotOnDeezer(f"https://deezer.com/track/{link_id}")
         else:
-            raise ISRCnotOnDeezer(f"https://deezer.com/track/{link_id}")
+            trackAPI_gw = dz.gw.get_track(link_id)
+            trackAPI = map_track(trackAPI_gw)
+    else:
+        link_id = trackAPI['id']
     if not str(link_id).strip('-').isdecimal(): raise InvalidID(f"https://deezer.com/track/{link_id}")
 
-    # Get essential track info
-    try:
-        trackAPI_gw = dz.gw.get_track_with_fallback(link_id)
-    except GWAPIError as e:
-        raise GenerationError(f"https://deezer.com/track/{link_id}", str(e)) from e
+    cover = None
+    if trackAPI['album']['cover_small']:
+        cover = trackAPI['album']['cover_small'][:-24] + '/75x75-000000-80-0-0.jpg'
+    else:
+        cover = f"https://e-cdns-images.dzcdn.net/images/cover/{trackAPI['md5_image']}/75x75-000000-80-0-0.jpg"
 
-    title = trackAPI_gw['SNG_TITLE'].strip()
-    if trackAPI_gw.get('VERSION') and trackAPI_gw['VERSION'] not in trackAPI_gw['SNG_TITLE']:
-        title += f" {trackAPI_gw['VERSION']}".strip()
-    explicit = bool(int(trackAPI_gw.get('EXPLICIT_LYRICS', 0)))
+    del trackAPI['track_token']
 
     return Single({
         'type': 'track',
         'id': link_id,
         'bitrate': bitrate,
-        'title': title,
-        'artist': trackAPI_gw['ART_NAME'],
-        'cover': f"https://e-cdns-images.dzcdn.net/images/cover/{trackAPI_gw['ALB_PICTURE']}/75x75-000000-80-0-0.jpg",
-        'explicit': explicit,
+        'title': trackAPI['title'],
+        'artist': trackAPI['artist']['name'],
+        'cover': cover,
+        'explicit': trackAPI.explicit_lyrics,
         'single': {
-            'trackAPI_gw': trackAPI_gw,
             'trackAPI': trackAPI,
             'albumAPI': albumAPI
         }
@@ -66,7 +69,14 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
         link_id = albumAPI['id']
     else:
         try:
-            albumAPI = dz.api.get_album(link_id)
+            albumAPI_gw_page = dz.gw.get_album_page(link_id)
+            if 'DATA' in albumAPI_gw_page:
+                albumAPI = map_album(albumAPI_gw_page['DATA'])
+                link_id = albumAPI_gw_page['DATA']['ALB_ID']
+                albumAPI_new = dz.api.get_album(link_id)
+                albumAPI.update(albumAPI_new)
+            else:
+                raise GenerationError(f"https://deezer.com/album/{link_id}", "Can't find the album")
         except APIError as e:
             raise GenerationError(f"https://deezer.com/album/{link_id}", str(e)) from e
 
@@ -75,9 +85,9 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
     # Get extra info about album
     # This saves extra api calls when downloading
     albumAPI_gw = dz.gw.get_album(link_id)
-    albumAPI['nb_disk'] = albumAPI_gw['NUMBER_DISK']
-    albumAPI['copyright'] = albumAPI_gw['COPYRIGHT']
-    albumAPI['release_date'] = albumAPI_gw['PHYSICAL_RELEASE_DATE']
+    albumAPI_gw = map_album(albumAPI_gw)
+    albumAPI_gw.update(albumAPI)
+    albumAPI = albumAPI_gw
     albumAPI['root_artist'] = rootArtist
 
     # If the album is a single download as a track
@@ -91,17 +101,16 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
     if albumAPI['cover_small'] is not None:
         cover = albumAPI['cover_small'][:-24] + '/75x75-000000-80-0-0.jpg'
     else:
-        cover = f"https://e-cdns-images.dzcdn.net/images/cover/{albumAPI_gw['ALB_PICTURE']}/75x75-000000-80-0-0.jpg"
+        cover = f"https://e-cdns-images.dzcdn.net/images/cover/{albumAPI['md5_image']}/75x75-000000-80-0-0.jpg"
 
     totalSize = len(tracksArray)
     albumAPI['nb_tracks'] = totalSize
     collection = []
     for pos, trackAPI in enumerate(tracksArray, start=1):
-        trackAPI['POSITION'] = pos
-        trackAPI['SIZE'] = totalSize
+        trackAPI = map_track(trackAPI)
+        del trackAPI['track_token']
+        trackAPI['position'] = pos
         collection.append(trackAPI)
-
-    explicit = albumAPI_gw.get('EXPLICIT_ALBUM_CONTENT', {}).get('EXPLICIT_LYRICS_STATUS', LyricsStatus.UNKNOWN) in [LyricsStatus.EXPLICIT, LyricsStatus.PARTIALLY_EXPLICIT]
 
     return Collection({
         'type': 'album',
@@ -110,10 +119,10 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
         'title': albumAPI['title'],
         'artist': albumAPI['artist']['name'],
         'cover': cover,
-        'explicit': explicit,
+        'explicit': albumAPI['explicit_lyrics'],
         'size': totalSize,
         'collection': {
-            'tracks_gw': collection,
+            'tracks': collection,
             'albumAPI': albumAPI
         }
     })
@@ -147,10 +156,11 @@ def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksA
     playlistAPI['nb_tracks'] = totalSize
     collection = []
     for pos, trackAPI in enumerate(playlistTracksAPI, start=1):
-        if trackAPI.get('EXPLICIT_TRACK_CONTENT', {}).get('EXPLICIT_LYRICS_STATUS', LyricsStatus.UNKNOWN) in [LyricsStatus.EXPLICIT, LyricsStatus.PARTIALLY_EXPLICIT]:
+        trackAPI = map_track(trackAPI)
+        if trackAPI['explicit_lyrics']:
             playlistAPI['explicit'] = True
-        trackAPI['POSITION'] = pos
-        trackAPI['SIZE'] = totalSize
+        del trackAPI['track_token']
+        trackAPI['position'] = pos
         collection.append(trackAPI)
 
     if 'explicit' not in playlistAPI: playlistAPI['explicit'] = False
@@ -165,7 +175,7 @@ def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksA
         'explicit': playlistAPI['explicit'],
         'size': totalSize,
         'collection': {
-            'tracks_gw': collection,
+            'tracks': collection,
             'playlistAPI': playlistAPI
         }
     })

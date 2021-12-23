@@ -1,5 +1,3 @@
-from deezer.gw import LyricsStatus
-
 from deemix.utils import removeDuplicateArtists, removeFeatures
 from deemix.types.Artist import Artist
 from deemix.types.Date import Date
@@ -30,7 +28,7 @@ class Album:
         self.rootArtist = None
         self.variousArtists = None
 
-        self.playlistId = None
+        self.playlistID = None
         self.owner = None
         self.isPlaylist = False
 
@@ -39,8 +37,9 @@ class Album:
 
         # Getting artist image ID
         # ex: https://e-cdns-images.dzcdn.net/images/artist/f2bc007e9133c946ac3c3907ddc5d2ea/56x56-000000-80-0-0.jpg
-        art_pic = albumAPI['artist']['picture_small']
-        art_pic = art_pic[art_pic.find('artist/') + 7:-24]
+        art_pic = albumAPI['artist'].get('picture_small')
+        if art_pic: art_pic = art_pic[art_pic.find('artist/') + 7:-24]
+        else: art_pic = ""
         self.mainArtist = Artist(
             albumAPI['artist']['id'],
             albumAPI['artist']['name'],
@@ -83,51 +82,30 @@ class Album:
         self.barcode = albumAPI.get('upc', self.barcode)
         self.label = albumAPI.get('label', self.label)
         self.explicit = bool(albumAPI.get('explicit_lyrics', False))
-        if 'release_date' in albumAPI:
-            self.date.day = albumAPI["release_date"][8:10]
-            self.date.month = albumAPI["release_date"][5:7]
-            self.date.year = albumAPI["release_date"][0:4]
+        release_date = albumAPI.get('release_date')
+        if 'physical_release_date' in albumAPI:
+            release_date = albumAPI['physical_release_date']
+        if release_date:
+            self.date.day = release_date[8:10]
+            self.date.month = release_date[5:7]
+            self.date.year = release_date[0:4]
             self.date.fixDayMonth()
 
         self.discTotal = albumAPI.get('nb_disk')
         self.copyright = albumAPI.get('copyright')
 
-        if self.pic.md5 == "" and albumAPI.get('cover_small'):
-            # Getting album cover MD5
-            # ex: https://e-cdns-images.dzcdn.net/images/cover/2e018122cb56986277102d2041a592c8/56x56-000000-80-0-0.jpg
-            alb_pic = albumAPI['cover_small']
-            self.pic.md5 = alb_pic[alb_pic.find('cover/') + 6:-24]
+        if self.pic.md5 == "":
+            if albumAPI.get('md5_image'):
+                self.pic.md5 = albumAPI['md5_image']
+            elif albumAPI.get('cover_small'):
+                # Getting album cover MD5
+                # ex: https://e-cdns-images.dzcdn.net/images/cover/2e018122cb56986277102d2041a592c8/56x56-000000-80-0-0.jpg
+                alb_pic = albumAPI['cover_small']
+                self.pic.md5 = alb_pic[alb_pic.find('cover/') + 6:-24]
 
         if albumAPI.get('genres') and len(albumAPI['genres'].get('data', [])) > 0:
             for genre in albumAPI['genres']['data']:
                 self.genre.append(genre['name'])
-
-    def parseAlbumGW(self, albumAPI_gw):
-        self.title = albumAPI_gw['ALB_TITLE']
-        self.mainArtist = Artist(
-            art_id = albumAPI_gw['ART_ID'],
-            name = albumAPI_gw['ART_NAME'],
-            role = "Main"
-        )
-
-        self.artists = [albumAPI_gw['ART_NAME']]
-        self.trackTotal = albumAPI_gw['NUMBER_TRACK']
-        self.discTotal = albumAPI_gw['NUMBER_DISK']
-        self.label = albumAPI_gw.get('LABEL_NAME', self.label)
-
-        explicitLyricsStatus = albumAPI_gw.get('EXPLICIT_ALBUM_CONTENT', {}).get('EXPLICIT_LYRICS_STATUS', LyricsStatus.UNKNOWN)
-        self.explicit = explicitLyricsStatus in [LyricsStatus.EXPLICIT, LyricsStatus.PARTIALLY_EXPLICIT]
-
-        self.addExtraAlbumGWData(albumAPI_gw)
-
-    def addExtraAlbumGWData(self, albumAPI_gw):
-        if self.pic.md5 == "" and albumAPI_gw.get('ALB_PICTURE'):
-            self.pic.md5 = albumAPI_gw['ALB_PICTURE']
-        if 'PHYSICAL_RELEASE_DATE' in albumAPI_gw:
-            self.date.day = albumAPI_gw["PHYSICAL_RELEASE_DATE"][8:10]
-            self.date.month = albumAPI_gw["PHYSICAL_RELEASE_DATE"][5:7]
-            self.date.year = albumAPI_gw["PHYSICAL_RELEASE_DATE"][0:4]
-            self.date.fixDayMonth()
 
     def makePlaylistCompilation(self, playlist):
         self.variousArtists = playlist.variousArtists

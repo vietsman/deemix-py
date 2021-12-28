@@ -113,7 +113,7 @@ def getPreferredBitrate(dz, track, preferredBitrate, shouldFallback, feelingLuck
         url = None
         # Check the track with the legit method
         wrongLicense = (
-            (formatName == "FLAC" or formatName.startswidth("MP4_RA")) and not dz.current_user.get('can_stream_lossless') or \
+            (formatName == "FLAC" or formatName.startswith("MP4_RA")) and not dz.current_user.get('can_stream_lossless') or \
             formatName == "MP3_320" and not dz.current_user.get('can_stream_hq')
         )
         if track.filesizes.get(formatName.lower()) and track.filesizes[formatName.lower()] != "0":

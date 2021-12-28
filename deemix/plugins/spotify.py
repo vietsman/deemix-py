@@ -13,6 +13,7 @@ from deemix.types.DownloadObjects import Convertable, Collection
 
 import spotipy
 SpotifyClientCredentials = spotipy.oauth2.SpotifyClientCredentials
+CacheFileHandler = spotipy.cache_handler.CacheFileHandler
 
 class Spotify(Plugin):
     def __init__(self, configFolder=None):
@@ -361,8 +362,10 @@ class Spotify(Plugin):
             return
 
         try:
+            cache_handler = CacheFileHandler(self.configFolder / ".auth-cache")
             client_credentials_manager = SpotifyClientCredentials(client_id=self.credentials['clientId'],
-                                                                  client_secret=self.credentials['clientSecret'])
+                                                                  client_secret=self.credentials['clientSecret'],
+                                                                  cache_handler=cache_handler)
             self.sp = spotipy.Spotify(client_credentials_manager=client_credentials_manager)
             self.sp.user_playlists('spotify')
             self.enabled = True

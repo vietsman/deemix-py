@@ -36,7 +36,7 @@ def generateTrackItem(dz, link_id, bitrate, trackAPI=None, albumAPI=None):
     else:
         cover = f"https://e-cdns-images.dzcdn.net/images/cover/{trackAPI['md5_image']}/75x75-000000-80-0-0.jpg"
 
-    del trackAPI['track_token']
+    if 'track_token' in trackAPI: del trackAPI['track_token']
 
     return Single({
         'type': 'track',
@@ -108,7 +108,7 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
     collection = []
     for pos, trackAPI in enumerate(tracksArray, start=1):
         trackAPI = map_track(trackAPI)
-        del trackAPI['track_token']
+        if 'track_token' in trackAPI: del trackAPI['track_token']
         trackAPI['position'] = pos
         collection.append(trackAPI)
 
@@ -159,7 +159,7 @@ def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksA
         trackAPI = map_track(trackAPI)
         if trackAPI['explicit_lyrics']:
             playlistAPI['explicit'] = True
-        del trackAPI['track_token']
+        if 'track_token' in trackAPI: del trackAPI['track_token']
         trackAPI['position'] = pos
         collection.append(trackAPI)
 

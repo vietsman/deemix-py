@@ -45,7 +45,7 @@ def generateTrackItem(dz, link_id, bitrate, trackAPI=None, albumAPI=None):
         'title': trackAPI['title'],
         'artist': trackAPI['artist']['name'],
         'cover': cover,
-        'explicit': trackAPI.explicit_lyrics,
+        'explicit': trackAPI['explicit_lyrics'],
         'single': {
             'trackAPI': trackAPI,
             'albumAPI': albumAPI

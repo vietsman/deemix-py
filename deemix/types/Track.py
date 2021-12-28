@@ -196,13 +196,13 @@ class Track:
             pic_md5 = trackAPI['artist'].get('md5_image')
         )
 
-        if 'physical_release_date' in trackAPI:
+        if trackAPI.get('physical_release_date'):
             self.date.day = trackAPI["physical_release_date"][8:10]
             self.date.month = trackAPI["physical_release_date"][5:7]
             self.date.year = trackAPI["physical_release_date"][0:4]
             self.date.fixDayMonth()
 
-        for artist in trackAPI['contributors']:
+        for artist in trackAPI.get('contributors', []):
             isVariousArtists = str(artist['id']) == VARIOUS_ARTISTS
             isMainArtist = artist['role'] == "Main"
 
@@ -217,7 +217,7 @@ class Track:
                     self.artist[artist['role']] = []
                 self.artist[artist['role']].append(artist['name'])
 
-        if 'alternative_albums' in trackAPI and trackAPI['alternative_albums']:
+        if trackAPI.get('alternative_albums'):
             for album in trackAPI['alternative_albums']['data']:
                 if 'RIGHTS' in album and album['RIGHTS'].get('STREAM_ADS_AVAILABLE') or album['RIGHTS'].get('STREAM_SUB_AVAILABLE'):
                     self.albumsFallback.append(album['ALB_ID'])

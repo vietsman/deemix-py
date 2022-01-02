@@ -50,17 +50,20 @@ def removeFeatures(title):
     clean = title
     found = False
     pos = -1
-    if re.search(r"[\s(]?feat\.?\s", clean):
-        pos = re.search(r"[\s(]?feat\.?\s", clean).start(0)
+    if re.search(r"[\s(]\(?\s?feat\.?\s", clean):
+        pos = re.search(r"[\s(]\(?\s?feat\.?\s", clean).start(0)
         found = True
-    if re.search(r"[\s(]?ft\.?\s", clean):
-        pos = re.search(r"[\s(]?ft\.?\s", clean).start(0)
+    if re.search(r"[\s(]\(?\s?ft\.?\s", clean):
+        pos = re.search(r"[\s(]\(?\s?ft\.?\s", clean).start(0)
         found = True
-    openBracket = clean[pos] == '('
+    openBracket = clean[pos] == '(' or clean[pos+1] == '('
+    otherBracket = clean.find('(', pos+2)
     if found:
         tempTrack = clean[:pos]
         if ")" in clean and openBracket:
-            tempTrack += clean[clean.find(")", pos + 1) + 1:]
+            tempTrack += clean[clean.find(")", pos+2) + 1:]
+        if not openBracket and otherBracket != -1:
+            tempTrack += f" {clean[otherBracket:]}"
         clean = tempTrack.strip()
         clean = ' '.join(clean.split())
     return clean

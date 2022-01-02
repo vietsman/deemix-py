@@ -35,9 +35,9 @@ def changeCase(txt, case_type):
     if case_type == "upper":
         return txt.upper()
     if case_type == "start":
-        txt = txt.split(" ")
+        txt = txt.strip().split(" ")
         for i, word in enumerate(txt):
-            if word[0] in ['(', '{', '[']:
+            if word[0] in ['(', '{', '[', "'", '"']:
                 txt[i] = word[0] + word[1:].capitalize()
             else:
                 txt[i] = word.capitalize()

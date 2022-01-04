@@ -86,7 +86,7 @@ def streamTrack(outputStream, track, start=0, downloadObject=None, listener=None
                     if len(chunk) >= 2048:
                         chunk = decryptChunk(blowfish_key, chunk[0:2048]) + chunk[2048:]
 
-                if isStart and chunk[0] == 0:
+                if isStart and chunk[0] == 0 and chunk[4:8].decode('utf-8') != "ftyp":
                     for i, byte in enumerate(chunk):
                         if byte != 0: break
                     chunk = chunk[i:]

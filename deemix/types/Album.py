@@ -94,7 +94,7 @@ class Album:
         self.discTotal = albumAPI.get('nb_disk', "1")
         self.copyright = albumAPI.get('copyright', "")
 
-        if self.pic.md5 == "":
+        if not self.pic.md5 or self.pic.md5 == "":
             if albumAPI.get('md5_image'):
                 self.pic.md5 = albumAPI['md5_image']
             elif albumAPI.get('cover_small'):

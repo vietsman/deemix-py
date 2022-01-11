@@ -475,7 +475,7 @@ class Downloader:
                     newTrack = map_track(newTrack)
                     track.parseEssentialData(newTrack)
                     return self.downloadWrapper(extraData, track)
-                if len(track.albumsFallback) != 0 and self.settings.fallbackISRC:
+                if len(track.albumsFallback) != 0 and self.settings['fallbackISRC']:
                     newAlbumID = track.albumsFallback.pop()
                     newAlbum = self.dz.gw.get_album_page(newAlbumID)
                     fallbackID = 0

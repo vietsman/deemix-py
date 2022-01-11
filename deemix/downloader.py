@@ -504,14 +504,16 @@ class Downloader:
             result = {'error': {
                 'message': error.message,
                 'errid': error.errid,
-                'data': itemData
+                'data': itemData,
+                'type': "track"
             }}
         except Exception as e:
             logger.exception("%s %s", f"{itemData['artist']} - {itemData['title']}", e)
             result = {'error': {
                 'message': str(e),
                 'data': itemData,
-                'stack': traceback.format_exc()
+                'stack': traceback.format_exc(),
+                'type': "track"
             }}
 
         if 'error' in result:
@@ -525,37 +527,71 @@ class Downloader:
                     'failed': True,
                     'data': error['data'],
                     'error': error['message'],
-                    'errid': error['errid'] if 'errid' in error else None,
-                    'stack': error['stack'] if 'stack' in error else None
+                    'errid': error.get('errid'),
+                    'stack': error.get('stack'),
+                    'type': error['type']
                 })
         return result
+
+    def afterDownloadErrorReport(self, position, error, itemData=None):
+        if not itemData: itemData = {}
+        data = {'position': position }
+        data.update(itemData)
+        logger.exception("%s %s", position, error)
+        self.downloadObject.errors.append({
+            'message': str(error),
+            'stack': traceback.format_exc(),
+            'data': data,
+            'type': "post"
+        })
+        if self.listener:
+            self.listener.send("updateQueue", {
+                'uuid': self.downloadObject.uuid,
+                'postFailed': True,
+                'data': data,
+                'error': str(error),
+                'stack': traceback.format_exc(),
+                'type': "post"
+            })
 
     def afterDownloadSingle(self, track):
         if not self.downloadObject.extrasPath: self.downloadObject.extrasPath = Path(self.settings['downloadLocation'])
 
         # Save Album Cover
-        if self.settings['saveArtwork'] and 'albumPath' in track:
-            for image in track['albumURLs']:
-                downloadImage(image['url'], track['albumPath'] / f"{track['albumFilename']}.{image['ext']}", self.settings['overwriteFile'])
+        try:
+            if self.settings['saveArtwork'] and 'albumPath' in track:
+                for image in track['albumURLs']:
+                    downloadImage(image['url'], track['albumPath'] / f"{track['albumFilename']}.{image['ext']}", self.settings['overwriteFile'])
+        except Exception as e:
+            self.afterDownloadErrorReport("SaveLocalAlbumArt", e)
 
         # Save Artist Artwork
-        if self.settings['saveArtworkArtist'] and 'artistPath' in track:
-            for image in track['artistURLs']:
-                downloadImage(image['url'], track['artistPath'] / f"{track['artistFilename']}.{image['ext']}", self.settings['overwriteFile'])
+        try:
+            if self.settings['saveArtworkArtist'] and 'artistPath' in track:
+                for image in track['artistURLs']:
+                    downloadImage(image['url'], track['artistPath'] / f"{track['artistFilename']}.{image['ext']}", self.settings['overwriteFile'])
+        except Exception as e:
+            self.afterDownloadErrorReport("SaveLocalArtistArt", e)
 
         # Create searched logfile
-        if self.settings['logSearched'] and 'searched' in track:
-            filename = f"{track.data.artist} - {track.data.title}"
-            with open(self.downloadObject.extrasPath / 'searched.txt', 'w+', encoding="utf-8") as f:
-                searchedFile = f.read()
-                if not filename in searchedFile:
-                    if searchedFile != "": searchedFile += "\r\n"
-                    searchedFile += filename + "\r\n"
-                f.write(searchedFile)
+        try:
+            if self.settings['logSearched'] and 'searched' in track:
+                filename = f"{track.data.artist} - {track.data.title}"
+                with open(self.downloadObject.extrasPath / 'searched.txt', 'w+', encoding="utf-8") as f:
+                    searchedFile = f.read()
+                    if not filename in searchedFile:
+                        if searchedFile != "": searchedFile += "\r\n"
+                        searchedFile += filename + "\r\n"
+                    f.write(searchedFile)
+        except Exception as e:
+            self.afterDownloadErrorReport("CreateSearchedLog", e)
 
         # Execute command after download
-        if self.settings['executeCommand'] != "":
-            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.downloadObject.extrasPath))).replace("%filename%", quote(track['filename'])))
+        try:
+            if self.settings['executeCommand'] != "":
+                execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.downloadObject.extrasPath))).replace("%filename%", quote(track['filename'])))
+        except Exception as e:
+            self.afterDownloadErrorReport("ExecuteCommand", e)
 
     def afterDownloadCollection(self, tracks):
         if not self.downloadObject.extrasPath: self.downloadObject.extrasPath = Path(self.settings['downloadLocation'])
@@ -576,40 +612,61 @@ class Downloader:
             if 'searched' in track: searched += track['searched'] + "\r\n"
 
             # Save Album Cover
-            if self.settings['saveArtwork'] and 'albumPath' in track:
-                for image in track['albumURLs']:
-                    downloadImage(image['url'], track['albumPath'] / f"{track['albumFilename']}.{image['ext']}", self.settings['overwriteFile'])
+            try:
+                if self.settings['saveArtwork'] and 'albumPath' in track:
+                    for image in track['albumURLs']:
+                        downloadImage(image['url'], track['albumPath'] / f"{track['albumFilename']}.{image['ext']}", self.settings['overwriteFile'])
+            except Exception as e:
+                self.afterDownloadErrorReport("SaveLocalAlbumArt", e, track['data'])
 
             # Save Artist Artwork
-            if self.settings['saveArtworkArtist'] and 'artistPath' in track:
-                for image in track['artistURLs']:
-                    downloadImage(image['url'], track['artistPath'] / f"{track['artistFilename']}.{image['ext']}", self.settings['overwriteFile'])
+            try:
+                if self.settings['saveArtworkArtist'] and 'artistPath' in track:
+                    for image in track['artistURLs']:
+                        downloadImage(image['url'], track['artistPath'] / f"{track['artistFilename']}.{image['ext']}", self.settings['overwriteFile'])
+            except Exception as e:
+                self.afterDownloadErrorReport("SaveLocalArtistArt", e, track['data'])
 
             # Save filename for playlist file
             playlist[i] = track.get('filename', "")
 
         # Create errors logfile
-        if self.settings['logErrors'] and errors != "":
-            with open(self.downloadObject.extrasPath / 'errors.txt', 'w', encoding="utf-8") as f:
-                f.write(errors)
+        try:
+            if self.settings['logErrors'] and errors != "":
+                with open(self.downloadObject.extrasPath / 'errors.txt', 'w', encoding="utf-8") as f:
+                    f.write(errors)
+        except Exception as e:
+            self.afterDownloadErrorReport("CreateErrorLog", e)
 
         # Create searched logfile
-        if self.settings['logSearched'] and searched != "":
-            with open(self.downloadObject.extrasPath / 'searched.txt', 'w', encoding="utf-8") as f:
-                f.write(searched)
+        try:
+            if self.settings['logSearched'] and searched != "":
+                with open(self.downloadObject.extrasPath / 'searched.txt', 'w', encoding="utf-8") as f:
+                    f.write(searched)
+        except Exception as e:
+            self.afterDownloadErrorReport("CreateSearchedLog", e)
 
         # Save Playlist Artwork
-        if self.settings['saveArtwork'] and self.playlistCoverName and not self.settings['tags']['savePlaylistAsCompilation']:
-            for image in self.playlistURLs:
-                downloadImage(image['url'], self.downloadObject.extrasPath / f"{self.playlistCoverName}.{image['ext']}", self.settings['overwriteFile'])
+        try:
+            if self.settings['saveArtwork'] and self.playlistCoverName and not self.settings['tags']['savePlaylistAsCompilation']:
+                for image in self.playlistURLs:
+                    downloadImage(image['url'], self.downloadObject.extrasPath / f"{self.playlistCoverName}.{image['ext']}", self.settings['overwriteFile'])
+        except Exception as e:
+            self.afterDownloadErrorReport("SavePlaylistArt", e)
 
         # Create M3U8 File
-        if self.settings['createM3U8File']:
-            filename = generateDownloadObjectName(self.settings['playlistFilenameTemplate'], self.downloadObject, self.settings) or "playlist"
-            with open(self.downloadObject.extrasPath / f'{filename}.m3u8', 'w', encoding="utf-8") as f:
-                for line in playlist:
-                    f.write(line + "\n")
+        try:
+            if self.settings['createM3U8File']:
+                filename = generateDownloadObjectName(self.settings['playlistFilenameTemplate'], self.downloadObject, self.settings) or "playlist"
+                with open(self.downloadObject.extrasPath / f'{filename}.m3u8', 'w', encoding="utf-8") as f:
+                    for line in playlist:
+                        f.write(line + "\n")
+        except Exception as e:
+            self.afterDownloadErrorReport("CreatePlaylistFile", e)
 
         # Execute command after download
-        if self.settings['executeCommand'] != "":
-            execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.downloadObject.extrasPath))))
+        try:
+            if self.settings['executeCommand'] != "":
+                execute(self.settings['executeCommand'].replace("%folder%", quote(str(self.downloadObject.extrasPath))))
+        except Exception as e:
+            self.afterDownloadErrorReport("ExecuteCommand", e)

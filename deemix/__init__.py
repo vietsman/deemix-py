@@ -10,7 +10,7 @@ from deemix.itemgen import generateTrackItem, \
     generateArtistTopItem
 from deemix.errors import LinkNotRecognized, LinkNotSupported
 
-__version__ = "3.6.5"
+__version__ = "3.6.6"
 
 # Returns the Resolved URL, the Type and the ID
 def parseLink(link):

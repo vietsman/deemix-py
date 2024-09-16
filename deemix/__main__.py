@@ -34,31 +34,34 @@ def requestValidArl():
 @click.option('-p', '--path', type=str, help='Downloads in the given folder')
 @click.argument('url', nargs=-1, required=True)
 def download(url, bitrate, portable, path):
-    # Determine config folder
-    configFolder = Path('.') / 'config' if portable else localpaths.getConfigFolder()
-    arl_file_path = configFolder / '.arl'
-    
-    print(f"Using config folder: {configFolder}")
-    print(f"Checking for ARL at: {arl_file_path}")
+    # Check for local configFolder
+    localpath = Path('.')
+    configFolder = localpath / 'config' if portable else localpaths.getConfigFolder()
 
+    # Load settings before using them
+    settings = loadSettings(configFolder)
+    
     dz = Deezer()
     listener = LogListener()
 
-    # Check for existing ARL file
-    if arl_file_path.is_file():
-        with open(arl_file_path, 'r', encoding="utf-8") as f:
-            arl = f.readline().strip()
-        if dz.login_via_arl(arl):
-            print("ARL loaded and login successful.")
-        else:
-            print("Invalid ARL. Requesting new ARL.")
+    # Request valid ARL and login logic
+    def requestValidArl():
+        while True:
+            arl = input("Paste here your arl:")
+            if dz.login_via_arl(arl.strip()):
+                break
+        return arl
+
+    if (configFolder / '.arl').is_file():
+        with open(configFolder / '.arl', 'r', encoding="utf-8") as f:
+            arl = f.readline().rstrip("\n").strip()
+        if not dz.login_via_arl(arl):
             arl = requestValidArl()
-            with open(arl_file_path, 'w', encoding="utf-8") as f:
-                f.write(arl)
     else:
         arl = requestValidArl()
-        with open(arl_file_path, 'w', encoding="utf-8") as f:
-            f.write(arl)
+
+    with open(configFolder / '.arl', 'w', encoding="utf-8") as f:
+        f.write(arl)
 
     plugins = {}
     if Spotify:
@@ -68,8 +71,10 @@ def download(url, bitrate, portable, path):
         plugins["spotify"].setup()
 
     def downloadLinks(url, bitrate=None):
+        # Ensure settings are used correctly here
         if not bitrate:
             bitrate = settings.get("maxBitrate", TrackFormats.MP3_320)
+        
         links = []
         for link in url:
             if ';' in link:
@@ -77,6 +82,7 @@ def download(url, bitrate, portable, path):
                     links.append(l)
             else:
                 links.append(link)
+
         downloadObjects = []
         for link in links:
             try:
@@ -88,21 +94,31 @@ def download(url, bitrate, portable, path):
                 downloadObjects += downloadObject
             else:
                 downloadObjects.append(downloadObject)
+
         for obj in downloadObjects:
             if obj.__type__ == "Convertable":
                 obj = plugins[obj.plugin].convert(dz, obj, settings, listener)
             Downloader(dz, obj, settings, listener).start()
 
-    if path:
+    if path is not None:
+        if path == '':
+            path = '.'
         path = Path(path)
         settings['downloadLocation'] = str(path)
+
     url = list(url)
     if bitrate:
         bitrate = getBitrateNumberFromText(bitrate)
-    
-    # Handle file URLs
-    if Path(url[0]).is_file():
-        with open(url[0], encoding="utf-8") as f:
+
+    # Check if the first URL is a file path
+    try:
+        isfile = Path(url[0]).is_file()
+    except Exception:
+        isfile = False
+
+    if isfile:
+        filename = url[0]
+        with open(filename, encoding="utf-8") as f:
             url = f.readlines()
 
     downloadLinks(url, bitrate)

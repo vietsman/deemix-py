@@ -1,33 +1,91 @@
 # ![](./icon.svg) deemix
-## What is deemix?
-deemix is a deezer downloader built from the ashes of Deezloader Remix. The base library (or core) can be used as a stand alone CLI app or implemented in an UI using the API.
+
+deemix is a Deezer downloader library with a CLI entrypoint.
 
 ## Installation
-NOTE: If `python3` is "not a recognized command" try using `python` instead.<br>
-<br>
-### From PyPi
-You can install the library by using `pip`:<br>
-`python3 -m pip install deemix`<br>
-If you install it this way you can use the deemix CLI by using `deemix` directly in your terminal instead of `python3 -m deemix`
 
-### Building from source
-After installing Python open a terminal/command prompt and install the dependencies using `python3 -m pip install -r requirements.txt --user`<br>
-Run `python3 -m deemix --help` to see how to use the app in CLI mode.<br>
+### From PyPI
 
-## What's left to do?
-- Write the API Documentation
-- Fix whatever is broken
+```bash
+python3 -m pip install deemix
+```
 
-# License
-This program is free software: you can redistribute it and/or modify
-it under the terms of the GNU General Public License as published by
-the Free Software Foundation, either version 3 of the License, or
-(at your option) any later version.
+Then run:
 
-This program is distributed in the hope that it will be useful,
-but WITHOUT ANY WARRANTY; without even the implied warranty of
-MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-GNU General Public License for more details.
+```bash
+deemix --help
+```
 
-You should have received a copy of the GNU General Public License
-along with this program.  If not, see <https://www.gnu.org/licenses/>.
+### From source
+
+```bash
+git clone https://github.com/vietsman/deemix-py.git
+cd deemix-py
+python3 -m pip install -r requirements.txt
+python3 -m pip install -e .
+```
+
+## CLI usage
+
+Primary invocation remains:
+
+```bash
+deemix URL [URL ...]
+```
+
+Examples:
+
+```bash
+deemix https://www.deezer.com/track/3135556
+deemix "https://www.deezer.com/track/1;https://www.deezer.com/track/2"
+deemix /path/to/links.txt
+```
+
+Useful options:
+
+- `--portable` create `./config` in the current working directory
+- `-b, --bitrate` override configured bitrate
+- `-p, --path` override download destination
+- `-q, --quiet` suppress progress logs
+- `-v/-vv, --verbose` increase logging verbosity
+
+## Configuration
+
+Settings are stored in `config.json` under the deemix config folder (or `./config` with `--portable`).
+Authentication uses `.arl` in the same config folder.
+
+Public compatibility APIs remain available:
+
+- `deemix.parseLink`
+- `deemix.generateDownloadObject`
+- `deemix.settings.load`
+- `deemix.settings.save`
+- `deemix.settings.check`
+
+## Error handling and malformed tracks
+
+The downloader now treats malformed Deezer payloads as skipped items instead of hard failures.
+This includes tracks with empty `MEDIA` arrays or invalid payload shapes.
+
+For playlist/album-like collections, deemix tracks:
+
+- source item count
+- accepted item count
+- skipped item count
+- failed download count
+
+A malformed track should not abort an entire collection.
+
+## Development
+
+### Run tests
+
+```bash
+pytest
+```
+
+Tests are mock/offline oriented and must not contact Deezer APIs.
+
+## License
+
+This project is licensed under GPLv3. See `LICENSE.txt`.

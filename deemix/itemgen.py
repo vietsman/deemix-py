@@ -4,6 +4,7 @@ from deezer.errors import GWAPIError, APIError
 from deezer.utils import map_user_playlist, map_track, map_album
 
 from deemix.types.DownloadObjects import Single, Collection
+from deemix.contracts import normalize_external_track_payload
 from deemix.errors import GenerationError, ISRCnotOnDeezer, InvalidID, NotYourPrivatePlaylist
 
 logger = logging.getLogger('deemix')
@@ -16,26 +17,20 @@ def normalize_track_payload(track_data, *, context='track', position=None):
     incomplete payloads for deleted/unavailable tracks. These should be skipped
     instead of crashing the entire download queue.
     """
-    if not isinstance(track_data, dict):
-        logger.warning("Skipping %s at position %s: payload is not a dictionary.", context, position)
-        return None
-
-    media = track_data.get('MEDIA')
-    if isinstance(media, list) and len(media) == 0:
-        logger.warning("Skipping %s at position %s: empty MEDIA list.", context, position)
-        return None
-
-    try:
-        mapped = map_track(track_data)
-    except (IndexError, KeyError, TypeError, ValueError) as exc:
-        logger.warning("Skipping %s at position %s: invalid payload (%s).", context, position, exc)
-        return None
-
-    if not isinstance(mapped, dict):
-        logger.warning("Skipping %s at position %s: track mapper returned a non-dict value.", context, position)
-        return None
-
-    return mapped
+    normalized = normalize_external_track_payload(
+        track_data,
+        context=context,
+        position=position if position is not None else 0,
+        mapper=map_track,
+    )
+    if normalized.skipped:
+        logger.warning(
+            "Skipping %s at position %s: %s.",
+            context,
+            position,
+            normalized.skipped.reason,
+        )
+    return normalized.mapped
 
 
 def generateTrackItem(dz, link_id, bitrate, trackAPI=None, albumAPI=None):
@@ -137,13 +132,28 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
     totalSize = len(tracksArray)
     albumAPI['nb_tracks'] = totalSize
     collection = []
+    skipped = []
     for pos, trackAPI in enumerate(tracksArray, start=1):
-        normalized = normalize_track_payload(trackAPI, context='album track', position=pos)
-        if not normalized:
+        normalized_track = normalize_external_track_payload(
+            trackAPI,
+            context='album track',
+            position=pos,
+            mapper=map_track,
+        )
+        if normalized_track.skipped:
+            skipped.append(normalized_track.skipped.to_dict())
+            logger.warning(
+                "Skipping album track at position %s: %s.",
+                pos,
+                normalized_track.skipped.reason,
+            )
             continue
+        normalized = normalized_track.mapped
         if 'track_token' in normalized: del normalized['track_token']
         normalized['position'] = pos
         collection.append(normalized)
+
+    acceptedSize = len(collection)
 
     return Collection({
         'type': 'album',
@@ -153,10 +163,17 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
         'artist': albumAPI['artist']['name'],
         'cover': cover,
         'explicit': albumAPI['explicit_lyrics'],
-        'size': totalSize,
+        'size': acceptedSize,
+        'sourceSize': totalSize,
+        'acceptedSize': acceptedSize,
+        'skipped': skipped,
         'collection': {
             'tracks': collection,
-            'albumAPI': albumAPI
+            'albumAPI': albumAPI,
+            'skipped': skipped,
+            'source_size': totalSize,
+            'accepted_size': acceptedSize,
+            'skipped_count': len(skipped),
         }
     })
 
@@ -189,10 +206,23 @@ def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksA
     totalSize = len(playlistTracksAPI)
     playlistAPI['nb_tracks'] = totalSize
     collection = []
+    skipped = []
     for pos, trackAPI in enumerate(playlistTracksAPI, start=1):
-        normalized = normalize_track_payload(trackAPI, context='playlist track', position=pos)
-        if not normalized:
+        normalized_track = normalize_external_track_payload(
+            trackAPI,
+            context='playlist track',
+            position=pos,
+            mapper=map_track,
+        )
+        if normalized_track.skipped:
+            skipped.append(normalized_track.skipped.to_dict())
+            logger.warning(
+                "Skipping playlist track at position %s: %s.",
+                pos,
+                normalized_track.skipped.reason,
+            )
             continue
+        normalized = normalized_track.mapped
         if normalized.get('explicit_lyrics'):
             playlistAPI['explicit'] = True
         if 'track_token' in normalized: del normalized['track_token']
@@ -200,6 +230,7 @@ def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksA
         collection.append(normalized)
 
     if 'explicit' not in playlistAPI: playlistAPI['explicit'] = False
+    acceptedSize = len(collection)
 
     return Collection({
         'type': 'playlist',
@@ -209,10 +240,17 @@ def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksA
         'artist': playlistAPI['creator']['name'],
         'cover': playlistAPI['picture_small'][:-24] + '/75x75-000000-80-0-0.jpg',
         'explicit': playlistAPI['explicit'],
-        'size': totalSize,
+        'size': acceptedSize,
+        'sourceSize': totalSize,
+        'acceptedSize': acceptedSize,
+        'skipped': skipped,
         'collection': {
             'tracks': collection,
-            'playlistAPI': playlistAPI
+            'playlistAPI': playlistAPI,
+            'skipped': skipped,
+            'source_size': totalSize,
+            'accepted_size': acceptedSize,
+            'skipped_count': len(skipped),
         }
     })
 

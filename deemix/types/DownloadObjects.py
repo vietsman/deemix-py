@@ -11,6 +11,9 @@ class IDownloadObject:
         self.cover = obj['cover']
         self.explicit = obj.get('explicit', False)
         self.size = obj.get('size', 0)
+        self.sourceSize = obj.get('sourceSize', self.size)
+        self.acceptedSize = obj.get('acceptedSize', self.size)
+        self.skipped = obj.get('skipped', [])
         self.downloaded = obj.get('downloaded', 0)
         self.failed = obj.get('failed', 0)
         self.progress = obj.get('progress', 0)
@@ -34,6 +37,9 @@ class IDownloadObject:
             'cover': self.cover,
             'explicit': self.explicit,
             'size': self.size,
+            'sourceSize': self.sourceSize,
+            'acceptedSize': self.acceptedSize,
+            'skipped': self.skipped,
             'downloaded': self.downloaded,
             'failed': self.failed,
             'progress': self.progress,
@@ -71,6 +77,9 @@ class IDownloadObject:
             'cover': self.cover,
             'explicit': self.explicit,
             'size': self.size,
+            'sourceSize': self.sourceSize,
+            'acceptedSize': self.acceptedSize,
+            'skipped': self.skipped,
             'extrasPath': str(self.extrasPath)
         }
 

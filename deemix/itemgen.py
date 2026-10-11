@@ -8,6 +8,36 @@ from deemix.errors import GenerationError, ISRCnotOnDeezer, InvalidID, NotYourPr
 
 logger = logging.getLogger('deemix')
 
+
+def normalize_track_payload(track_data, *, context='track', position=None):
+    """Return a mapped track dict, or None when the payload is malformed.
+
+    Deezer occasionally returns track entries with empty MEDIA arrays or otherwise
+    incomplete payloads for deleted/unavailable tracks. These should be skipped
+    instead of crashing the entire download queue.
+    """
+    if not isinstance(track_data, dict):
+        logger.warning("Skipping %s at position %s: payload is not a dictionary.", context, position)
+        return None
+
+    media = track_data.get('MEDIA')
+    if isinstance(media, list) and len(media) == 0:
+        logger.warning("Skipping %s at position %s: empty MEDIA list.", context, position)
+        return None
+
+    try:
+        mapped = map_track(track_data)
+    except (IndexError, KeyError, TypeError, ValueError) as exc:
+        logger.warning("Skipping %s at position %s: invalid payload (%s).", context, position, exc)
+        return None
+
+    if not isinstance(mapped, dict):
+        logger.warning("Skipping %s at position %s: track mapper returned a non-dict value.", context, position)
+        return None
+
+    return mapped
+
+
 def generateTrackItem(dz, link_id, bitrate, trackAPI=None, albumAPI=None):
     # Get essential track info
     if not trackAPI:
@@ -51,6 +81,7 @@ def generateTrackItem(dz, link_id, bitrate, trackAPI=None, albumAPI=None):
             'albumAPI': albumAPI
         }
     })
+
 
 def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
     # Get essential album info
@@ -107,10 +138,12 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
     albumAPI['nb_tracks'] = totalSize
     collection = []
     for pos, trackAPI in enumerate(tracksArray, start=1):
-        trackAPI = map_track(trackAPI)
-        if 'track_token' in trackAPI: del trackAPI['track_token']
-        trackAPI['position'] = pos
-        collection.append(trackAPI)
+        normalized = normalize_track_payload(trackAPI, context='album track', position=pos)
+        if not normalized:
+            continue
+        if 'track_token' in normalized: del normalized['track_token']
+        normalized['position'] = pos
+        collection.append(normalized)
 
     return Collection({
         'type': 'album',
@@ -126,6 +159,7 @@ def generateAlbumItem(dz, link_id, bitrate, rootArtist=None):
             'albumAPI': albumAPI
         }
     })
+
 
 def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksAPI=None):
     if not playlistAPI:
@@ -156,12 +190,14 @@ def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksA
     playlistAPI['nb_tracks'] = totalSize
     collection = []
     for pos, trackAPI in enumerate(playlistTracksAPI, start=1):
-        trackAPI = map_track(trackAPI)
-        if trackAPI['explicit_lyrics']:
+        normalized = normalize_track_payload(trackAPI, context='playlist track', position=pos)
+        if not normalized:
+            continue
+        if normalized.get('explicit_lyrics'):
             playlistAPI['explicit'] = True
-        if 'track_token' in trackAPI: del trackAPI['track_token']
-        trackAPI['position'] = pos
-        collection.append(trackAPI)
+        if 'track_token' in normalized: del normalized['track_token']
+        normalized['position'] = pos
+        collection.append(normalized)
 
     if 'explicit' not in playlistAPI: playlistAPI['explicit'] = False
 
@@ -179,6 +215,7 @@ def generatePlaylistItem(dz, link_id, bitrate, playlistAPI=None, playlistTracksA
             'playlistAPI': playlistAPI
         }
     })
+
 
 def generateArtistItem(dz, link_id, bitrate, listener=None):
     if not str(link_id).isdecimal(): raise InvalidID(f"https://deezer.com/artist/{link_id}")
@@ -207,6 +244,7 @@ def generateArtistItem(dz, link_id, bitrate, listener=None):
     if listener: listener.send("finishAddingArtist", rootArtist)
     return albumList
 
+
 def generateArtistDiscographyItem(dz, link_id, bitrate, listener=None):
     if not str(link_id).isdecimal(): raise InvalidID(f"https://deezer.com/artist/{link_id}/discography")
     # Get essential artist info
@@ -234,6 +272,7 @@ def generateArtistDiscographyItem(dz, link_id, bitrate, listener=None):
 
     if listener: listener.send("finishAddingArtist", rootArtist)
     return albumList
+
 
 def generateArtistTopItem(dz, link_id, bitrate):
     if not str(link_id).isdecimal(): raise InvalidID(f"https://deezer.com/artist/{link_id}/top_track")
